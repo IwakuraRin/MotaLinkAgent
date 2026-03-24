@@ -1,0 +1,2 @@
+# SimpleRoboticArm
+基于ESP32S3单片机，使用MG996R开发的简易机械臂
