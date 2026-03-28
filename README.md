@@ -1,4 +1,4 @@
-MULD-Vehicle：多功能无人配送与操作小车
+MULD-Vehicle：多功能无人配送与物流装卸(车载机械臂）小车
 --
 MULD-Vehicle___Multifunctional.Unmanned.Logistics.Vehicle.for.Delivery_Handling
 
