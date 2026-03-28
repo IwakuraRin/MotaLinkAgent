@@ -1,0 +1,23 @@
+{
+    "authors": {
+        "name": "Brian Dickman",
+        "url": "https://os.mbed.com/users/bxd/"
+    },
+    "build": {
+        "builder": "MbedLibBuilder"
+    },
+    "description": "This is a library for our Adafruit 16-channel PWM & Servo driverPick one up today in the adafruit shop! ------> http://www.adafruit.com/products/815These displays use I2C to communicate, 2 pins are required tointerface.Adafruit invests time and resources providing this open source code, please support Adafruit and open-source hardware by purchasing products from Adafruit!Written by Limor Fried/Ladyada for Adafruit Industries.BSD license, check license.txt for more information All text above must",
+    "frameworks": "mbed",
+    "keywords": [
+        "i2c",
+        "pca9685",
+        "pwm"
+    ],
+    "name": "Adafruit_PWMServoDriver",
+    "platforms": "*",
+    "repository": {
+        "type": "hg",
+        "url": "https://os.mbed.com/users/bxd/code/Adafruit_PWMServoDriver/"
+    },
+    "version": "0.0.0+sha.41a00db32ae7"
+}
