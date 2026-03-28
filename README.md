@@ -1,6 +1,7 @@
+MULD-Vehicle：多功能无人配送与操作小车
+--
 MULD-Vehicle___Multifunctional.Unmanned.Logistics.Vehicle.for.Delivery_Handling
 Multifunctional Logistics Vehicle for Unmanned Delivery and Handling/缩写简称MULD Vehicle
-MULD-Vehicle：多功能无人配送与操作小车
 项目简介
 MULD-Vehicle 是一个集自动配送与抓取操作于一体的多功能无人小车开发平台。
 
