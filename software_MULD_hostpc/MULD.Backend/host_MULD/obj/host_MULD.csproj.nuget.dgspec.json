@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\MULD\\software_MULD_hostpc\\Muld_host\\host_MULD\\host_MULD.csproj": {}
+    "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj": {}
   },
   "projects": {
-    "D:\\MULD\\software_MULD_hostpc\\Muld_host\\host_MULD\\host_MULD.csproj": {
+    "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\MULD\\software_MULD_hostpc\\Muld_host\\host_MULD\\host_MULD.csproj",
+        "projectUniqueName": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj",
         "projectName": "host_MULD",
-        "projectPath": "D:\\MULD\\software_MULD_hostpc\\Muld_host\\host_MULD\\host_MULD.csproj",
+        "projectPath": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj",
         "packagesPath": "C:\\Users\\Iwaku\\.nuget\\packages\\",
-        "outputPath": "D:\\MULD\\software_MULD_hostpc\\Muld_host\\host_MULD\\obj\\",
+        "outputPath": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "D:\\CloudMusic\\NuGetPackages"
