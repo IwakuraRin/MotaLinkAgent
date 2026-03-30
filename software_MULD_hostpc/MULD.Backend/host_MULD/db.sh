@@ -1,0 +1,1 @@
+dotnet publish -c Release -r linux-x64 --self-contained true -p:IncludeAllContentForSelfExtract=true -o ./publish-linux-full
