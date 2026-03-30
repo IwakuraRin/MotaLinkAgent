@@ -3,79 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MULD小车控制台</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="assets/favicon.ico">
+    <title>MULD-Vehicle 控制面板</title>
 </head>
 <body>
-    <div class="container">
-        <!-- 头部 -->
-        <header>
-            <h1>🚀 MULD-Vehicle 控制台</h1>
-        </header>
-
-        <!-- 主要内容 -->
-        <main>
-            <!-- 左侧：摄像头画面 -->
-            <section class="camera-section">
-                <h2>📷 实时画面</h2>
-                <div class="video-box">
-                    <img id="camera-stream" src="assets/placeholder.jpg" alt="摄像头画面">
-                </div>
-            </section>
-
-            <!-- 右侧：串口控制 -->
-            <section class="control-section">
-                <h2>🔌 串口控制</h2>
-                
-                <!-- 串口连接 -->
-                <div class="control-group">
-                    <label>选择串口:</label>
-                    <select id="port-select">
-                        <option value="">加载中...</option>
-                    </select>
-                </div>
-                
-                <div class="control-group">
-                    <label>波特率:</label>
-                    <input type="number" id="baud-input" value="115200">
-                </div>
-                
-                <div class="button-group">
-                    <button id="open-btn" class="btn-success">打开串口</button>
-                    <button id="close-btn" class="btn-danger" disabled>关闭串口</button>
-                </div>
-                
-                <!-- 命令发送 -->
-                <div class="control-group">
-                    <label>发送命令:</label>
-                    <input type="text" id="command-input" placeholder="输入串口指令...">
-                    <button id="send-btn" class="btn-primary" disabled>发送</button>
-                </div>
-                
-                <!-- 状态显示 -->
-                <div class="status-box">
-                    <p>状态: <span id="status-text">准备就绪</span></p>
-                    <p>已连接设备: <span id="connected-device">无</span></p>
-                </div>
-            </section>
-
-            <!-- 底部：串口日志 -->
-            <section class="log-section">
-                <h2>📋 串口日志</h2>
-                <div class="log-box">
-                    <pre id="serial-log">等待串口数据...</pre>
-                </div>
-                <button id="clear-log" class="btn-secondary">清空日志</button>
-            </section>
-        </main>
-
-        <!-- 底部信息 -->
-        <footer>
-            <p>MULD-Vehicle 控制面板 v1.0 | 服务地址: <span id="api-url">http://localhost:5000</span></p>
-        </footer>
-    </div>
-
-    <script src="app.js"></script>
+    <div id="app"></div>
+    <script type="module" src="./main.js"></script>
 </body>
 </html>
