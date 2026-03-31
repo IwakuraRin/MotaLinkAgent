@@ -1,19 +1,16 @@
 {
   "version": 2,
-  "dgSpecHash": "Eb6yHRZZgJk=",
+  "dgSpecHash": "jkY6m6d4Tkk=",
   "success": true,
-  "projectFilePath": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj",
+  "projectFilePath": "/Users/kihon-son/Desktop/MULD/software_MULD_hostpc/MULD.Backend/host_MULD/host_MULD.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Iwaku\\.nuget\\packages\\runtime.linux-arm.runtime.native.system.io.ports\\7.0.0\\runtime.linux-arm.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\runtime.linux-arm64.runtime.native.system.io.ports\\7.0.0\\runtime.linux-arm64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\runtime.linux-x64.runtime.native.system.io.ports\\7.0.0\\runtime.linux-x64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\runtime.native.system.io.ports\\7.0.0\\runtime.native.system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\runtime.osx-arm64.runtime.native.system.io.ports\\7.0.0\\runtime.osx-arm64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\runtime.osx-x64.runtime.native.system.io.ports\\7.0.0\\runtime.osx-x64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\system.io.ports\\7.0.0\\system.io.ports.7.0.0.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\microsoft.netcore.app.runtime.linux-x64\\10.0.5\\microsoft.netcore.app.runtime.linux-x64.10.0.5.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.linux-x64\\10.0.5\\microsoft.aspnetcore.app.runtime.linux-x64.10.0.5.nupkg.sha512",
-    "C:\\Users\\Iwaku\\.nuget\\packages\\microsoft.netcore.app.host.linux-x64\\10.0.5\\microsoft.netcore.app.host.linux-x64.10.0.5.nupkg.sha512"
+    "/Users/kihon-son/.nuget/packages/runtime.linux-arm.runtime.native.system.io.ports/7.0.0/runtime.linux-arm.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
+    "/Users/kihon-son/.nuget/packages/runtime.linux-arm64.runtime.native.system.io.ports/7.0.0/runtime.linux-arm64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
+    "/Users/kihon-son/.nuget/packages/runtime.linux-x64.runtime.native.system.io.ports/7.0.0/runtime.linux-x64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
+    "/Users/kihon-son/.nuget/packages/runtime.native.system.io.ports/7.0.0/runtime.native.system.io.ports.7.0.0.nupkg.sha512",
+    "/Users/kihon-son/.nuget/packages/runtime.osx-arm64.runtime.native.system.io.ports/7.0.0/runtime.osx-arm64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
+    "/Users/kihon-son/.nuget/packages/runtime.osx-x64.runtime.native.system.io.ports/7.0.0/runtime.osx-x64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
+    "/Users/kihon-son/.nuget/packages/system.io.ports/7.0.0/system.io.ports.7.0.0.nupkg.sha512"
   ],
   "logs": []
 }

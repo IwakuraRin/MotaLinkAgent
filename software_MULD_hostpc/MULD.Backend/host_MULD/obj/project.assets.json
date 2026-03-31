@@ -86,55 +86,6 @@
           }
         }
       }
-    },
-    "net10.0/linux-x64": {
-      "runtime.linux-arm.runtime.native.System.IO.Ports/7.0.0": {
-        "type": "package"
-      },
-      "runtime.linux-arm64.runtime.native.System.IO.Ports/7.0.0": {
-        "type": "package"
-      },
-      "runtime.linux-x64.runtime.native.System.IO.Ports/7.0.0": {
-        "type": "package",
-        "native": {
-          "runtimes/linux-x64/native/libSystem.IO.Ports.Native.so": {}
-        }
-      },
-      "runtime.native.System.IO.Ports/7.0.0": {
-        "type": "package",
-        "dependencies": {
-          "runtime.linux-arm.runtime.native.System.IO.Ports": "7.0.0",
-          "runtime.linux-arm64.runtime.native.System.IO.Ports": "7.0.0",
-          "runtime.linux-x64.runtime.native.System.IO.Ports": "7.0.0",
-          "runtime.osx-arm64.runtime.native.System.IO.Ports": "7.0.0",
-          "runtime.osx-x64.runtime.native.System.IO.Ports": "7.0.0"
-        }
-      },
-      "runtime.osx-arm64.runtime.native.System.IO.Ports/7.0.0": {
-        "type": "package"
-      },
-      "runtime.osx-x64.runtime.native.System.IO.Ports/7.0.0": {
-        "type": "package"
-      },
-      "System.IO.Ports/7.0.0": {
-        "type": "package",
-        "dependencies": {
-          "runtime.native.System.IO.Ports": "7.0.0"
-        },
-        "compile": {
-          "lib/net7.0/System.IO.Ports.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "runtimes/unix/lib/net7.0/System.IO.Ports.dll": {
-            "related": ".xml"
-          }
-        },
-        "build": {
-          "buildTransitive/net6.0/_._": {}
-        }
-      }
     }
   },
   "libraries": {
@@ -275,31 +226,24 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Iwaku\\.nuget\\packages\\": {},
-    "D:\\CloudMusic\\NuGetPackages": {}
+    "/Users/kihon-son/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj",
+      "projectUniqueName": "/Users/kihon-son/Desktop/MULD/software_MULD_hostpc/MULD.Backend/host_MULD/host_MULD.csproj",
       "projectName": "host_MULD",
-      "projectPath": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\host_MULD.csproj",
-      "packagesPath": "C:\\Users\\Iwaku\\.nuget\\packages\\",
-      "outputPath": "D:\\MULD\\software_MULD_hostpc\\MULD.Backend\\host_MULD\\obj\\",
+      "projectPath": "/Users/kihon-son/Desktop/MULD/software_MULD_hostpc/MULD.Backend/host_MULD/host_MULD.csproj",
+      "packagesPath": "/Users/kihon-son/.nuget/packages/",
+      "outputPath": "/Users/kihon-son/Desktop/MULD/software_MULD_hostpc/MULD.Backend/host_MULD/obj/",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "D:\\CloudMusic\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\Iwaku\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "/Users/kihon-son/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -340,20 +284,6 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "downloadDependencies": [
-          {
-            "name": "Microsoft.AspNetCore.App.Runtime.linux-x64",
-            "version": "[10.0.5, 10.0.5]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Host.linux-x64",
-            "version": "[10.0.5, 10.0.5]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Runtime.linux-x64",
-            "version": "[10.0.5, 10.0.5]"
-          }
-        ],
         "frameworkReferences": {
           "Microsoft.AspNetCore.App": {
             "privateAssets": "none"
@@ -362,7 +292,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.AspNetCore": "(,10.0.32767]",
           "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
@@ -777,11 +707,6 @@
           "System.Xml.XPath": "(,4.3.32767]",
           "System.Xml.XPath.XDocument": "(,5.0.32767]"
         }
-      }
-    },
-    "runtimes": {
-      "linux-x64": {
-        "#import": []
       }
     }
   }

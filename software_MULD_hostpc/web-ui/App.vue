@@ -10,7 +10,7 @@
       <SerialControl
         :ports="ports"
         :is-port-open="isPortOpen"
-        :status="status"
+        :status="status"`
         :connected-device="connectedDevice"
         :api-base-url="apiBaseUrlDisplay"
         v-model:selected-port="selectedPort"
@@ -31,174 +31,187 @@
   </div>
 </template>
 
-<script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+<script>
 import CameraView from './components/CameraView.vue';
 import SerialControl from './components/SerialControl.vue';
 import SerialLog from './components/SerialLog.vue';
 
 const envApiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const apiBaseUrlDisplay = envApiBase || '当前域名(通过 Vite 代理)';
 const today = new Date().toLocaleDateString();
 
-const ports = ref([]);
-const selectedPort = ref('');
-const baudRate = ref(115200);
-const isPortOpen = ref(false);
-const command = ref('');
-const connectedDevice = ref('');
-const status = ref('准备就绪');
-const serialLog = ref('');
-const eventSource = ref(null);
-const reconnectTimer = ref(null);
+export default {
+  name: 'App',
+  components: {
+    CameraView,
+    SerialControl,
+    SerialLog,
+  },
+  data() {
+    return {
+      // 接口基地址（为空时走 Vite 代理）
+      envApiBase,
+      // 仅用于界面显示，方便确认当前后端地址
+      apiBaseUrlDisplay: envApiBase || '当前域名(通过 Vite 代理)',
+      // 页脚日期（页面加载时生成一次）
+      today,
+      // 串口相关状态
+      ports: [],
+      selectedPort: '',
+      baudRate: 115200,
+      isPortOpen: false,
+      command: '',
+      connectedDevice: '',
+      status: '准备就绪',
+      serialLog: '',
+      // SSE 连接和重连定时器
+      eventSource: null,
+      reconnectTimer: null,
+      // 摄像头地址
+      cameraUrl: `${envApiBase}/camera` || '/camera',
+    };
+  },
+  methods: {
+    apiUrl(path) {
+      return `${this.envApiBase}${path}`;
+    },
+    log(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      this.serialLog += `[${timestamp}] ${message}\n`;
+    },
+    async loadSerialPorts() {
+      try {
+        this.status = '正在加载串口列表...';
+        const response = await fetch(this.apiUrl('/api/serial/ports'));
+        if (!response.ok) throw new Error('获取串口列表失败');
 
-const cameraUrl = ref(`${envApiBase}/camera` || '/camera');
+        const list = await response.json();
+        this.ports = Array.isArray(list) ? list : [];
+        if (!this.selectedPort && this.ports.length > 0) {
+          this.selectedPort = this.ports[0];
+        }
+        this.status = this.ports.length > 0 ? '串口列表已加载' : '无可用串口';
+      } catch (error) {
+        this.status = `加载串口失败: ${error.message}`;
+        this.log(`错误: ${error.message}`);
+      }
+    },
+    async openSerialPort() {
+      if (!this.selectedPort) {
+        this.log('请先选择一个串口');
+        return;
+      }
 
-function apiUrl(path) {
-  return `${envApiBase}${path}`;
-}
+      this.status = `正在打开串口 ${this.selectedPort}...`;
 
-function log(message) {
-  const timestamp = new Date().toLocaleTimeString();
-  serialLog.value += `[${timestamp}] ${message}\n`;
-}
+      try {
+        const response = await fetch(this.apiUrl('/api/serial/open'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            portName: this.selectedPort,
+            baudRate: Number(this.baudRate) || 115200,
+          }),
+        });
 
-async function loadSerialPorts() {
-  try {
-    status.value = '正在加载串口列表...';
-    const response = await fetch(apiUrl('/api/serial/ports'));
-    if (!response.ok) throw new Error('获取串口列表失败');
+        if (!response.ok) throw new Error('服务器返回错误');
 
-    const list = await response.json();
-    ports.value = Array.isArray(list) ? list : [];
-    if (!selectedPort.value && ports.value.length > 0) {
-      selectedPort.value = ports.value[0];
-    }
-    status.value = ports.value.length > 0 ? '串口列表已加载' : '无可用串口';
-  } catch (error) {
-    status.value = `加载串口失败: ${error.message}`;
-    log(`错误: ${error.message}`);
-  }
-}
+        this.isPortOpen = true;
+        this.connectedDevice = this.selectedPort;
+        this.status = `串口 ${this.selectedPort} 已打开`;
+        this.log(`串口已打开: ${this.selectedPort} @ ${this.baudRate}bps`);
+        this.startEventSource();
+      } catch (error) {
+        this.status = '打开串口失败';
+        this.log(`打开串口失败: ${error.message}`);
+      }
+    },
+    async closeSerialPort() {
+      this.status = '正在关闭串口...';
 
-async function openSerialPort() {
-  if (!selectedPort.value) {
-    log('请先选择一个串口');
-    return;
-  }
+      try {
+        const response = await fetch(this.apiUrl('/api/serial/close'), { method: 'POST' });
+        if (!response.ok) throw new Error('服务器返回错误');
 
-  status.value = `正在打开串口 ${selectedPort.value}...`;
+        this.isPortOpen = false;
+        this.connectedDevice = '';
+        this.status = '串口已关闭';
+        this.log('串口已关闭');
+        this.stopEventSource();
+      } catch (error) {
+        this.status = '关闭串口失败';
+        this.log(`关闭串口失败: ${error.message}`);
+      }
+    },
+    async sendCommand() {
+      const trimmed = this.command.trim();
+      if (!trimmed) {
+        this.log('请输入要发送的命令');
+        return;
+      }
+      if (!this.isPortOpen) {
+        this.log('请先打开串口');
+        return;
+      }
 
-  try {
-    const response = await fetch(apiUrl('/api/serial/open'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        portName: selectedPort.value,
-        baudRate: Number(baudRate.value) || 115200,
-      }),
-    });
+      try {
+        const response = await fetch(this.apiUrl('/api/serial/send'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: trimmed }),
+        });
+        if (!response.ok) throw new Error('发送失败');
 
-    if (!response.ok) throw new Error('服务器返回错误');
+        this.log(`发送: ${trimmed}`);
+        this.command = '';
+      } catch (error) {
+        this.log(`发送失败: ${error.message}`);
+      }
+    },
+    startEventSource() {
+      this.stopEventSource();
+      this.eventSource = new EventSource(this.apiUrl('/api/serial/stream'));
 
-    isPortOpen.value = true;
-    connectedDevice.value = selectedPort.value;
-    status.value = `串口 ${selectedPort.value} 已打开`;
-    log(`串口已打开: ${selectedPort.value} @ ${baudRate.value}bps`);
-    startEventSource();
-  } catch (error) {
-    status.value = '打开串口失败';
-    log(`打开串口失败: ${error.message}`);
-  }
-}
+      this.eventSource.onmessage = (event) => {
+        let dataText = event.data;
+        try {
+          const parsed = JSON.parse(event.data);
+          dataText = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
+        } catch {
+          // 后端可能直接返回纯文本，这里直接按文本记录日志
+        }
+        this.log(`接收: ${dataText}`);
+      };
 
-async function closeSerialPort() {
-  status.value = '正在关闭串口...';
-
-  try {
-    const response = await fetch(apiUrl('/api/serial/close'), { method: 'POST' });
-    if (!response.ok) throw new Error('服务器返回错误');
-
-    isPortOpen.value = false;
-    connectedDevice.value = '';
-    status.value = '串口已关闭';
-    log('串口已关闭');
-    stopEventSource();
-  } catch (error) {
-    status.value = '关闭串口失败';
-    log(`关闭串口失败: ${error.message}`);
-  }
-}
-
-async function sendCommand() {
-  const trimmed = command.value.trim();
-  if (!trimmed) {
-    log('请输入要发送的命令');
-    return;
-  }
-  if (!isPortOpen.value) {
-    log('请先打开串口');
-    return;
-  }
-
-  try {
-    const response = await fetch(apiUrl('/api/serial/send'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: trimmed }),
-    });
-    if (!response.ok) throw new Error('发送失败');
-
-    log(`发送: ${trimmed}`);
-    command.value = '';
-  } catch (error) {
-    log(`发送失败: ${error.message}`);
-  }
-}
-
-function startEventSource() {
-  stopEventSource();
-  eventSource.value = new EventSource(apiUrl('/api/serial/stream'));
-
-  eventSource.value.onmessage = (event) => {
-    let dataText = event.data;
-    try {
-      const parsed = JSON.parse(event.data);
-      dataText = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
-    } catch {
-      // plain text payload
-    }
-    log(`接收: ${dataText}`);
-  };
-
-  eventSource.value.onerror = () => {
-    if (isPortOpen.value) {
-      log('串口数据流中断，3 秒后重连...');
-      clearTimeout(reconnectTimer.value);
-      reconnectTimer.value = setTimeout(startEventSource, 3000);
-    }
-  };
-}
-
-function stopEventSource() {
-  clearTimeout(reconnectTimer.value);
-  reconnectTimer.value = null;
-  if (eventSource.value) {
-    eventSource.value.close();
-    eventSource.value = null;
-  }
-}
-
-function clearLog() {
-  serialLog.value = '';
-  log('日志已清空');
-}
-
-function onCameraError() {
-  status.value = '摄像头加载失败';
-  log('摄像头加载失败，请检查地址和后端服务');
-}
-
-onMounted(loadSerialPorts);
-onBeforeUnmount(stopEventSource);
+      this.eventSource.onerror = () => {
+        if (this.isPortOpen) {
+          this.log('串口数据流中断，3 秒后重连...');
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = setTimeout(() => this.startEventSource(), 3000);
+        }
+      };
+    },
+    stopEventSource() {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      if (this.eventSource) {
+        this.eventSource.close();
+        this.eventSource = null;
+      }
+    },
+    clearLog() {
+      this.serialLog = '';
+      this.log('日志已清空');
+    },
+    onCameraError() {
+      this.status = '摄像头加载失败';
+      this.log('摄像头加载失败，请检查地址和后端服务');
+    },
+  },
+  mounted() {
+    this.loadSerialPorts();
+  },
+  beforeUnmount() {
+    this.stopEventSource();
+  },
+};
 </script>
