@@ -1,36 +1,46 @@
 <template>
   <section class="panel log-panel">
-    <h2>📋 串口日志</h2>
+    <h2>SYSTEM LOG</h2>
     <div class="log-box" ref="logBox">
-      <pre>{{ serialLog || '等待串口数据...' }}</pre>
+      <pre>{{ serialLog || 'Waiting for serial data...' }}</pre>
     </div>
-    <button @click="$emit('clear')" class="btn-secondary">清空日志</button>
+    <button @click="$emit('clear')" class="btn-secondary">Clear Log</button>
   </section>
 </template>
 
-<script setup>
-import { nextTick, ref, watch } from 'vue';
+<script>
+import { nextTick } from 'vue';
 
-const props = defineProps({
-  serialLog: {
-    type: String,
-    default: '',
+export default {
+  name: 'SerialLog',
+  props: {
+    // 串口日志字符串，由父组件传入
+    serialLog: {
+      type: String,
+      default: '',
+    },
   },
-});
-
-defineEmits(['clear']);
-
-const logBox = ref(null);
-
-watch(
-  () => props.serialLog,
-  async () => {
-    await nextTick();
-    if (logBox.value) {
-      logBox.value.scrollTop = logBox.value.scrollHeight;
-    }
-  }
-);
+  emits: ['clear'],
+  data() {
+    return {
+      // 日志容器 DOM 引用，用来自动滚动到底部
+      logBox: null,
+    };
+  },
+  watch: {
+    // 监听日志内容变化，变化后把滚动条滑到最底
+    async serialLog() {
+      await nextTick();
+      if (this.logBox) {
+        this.logBox.scrollTop = this.logBox.scrollHeight;
+      }
+    },
+  },
+  mounted() {
+    // 在挂载时获取真实 DOM 引用
+    this.logBox = this.$refs.logBox;
+  },
+};
 </script>
 
 <style scoped>
