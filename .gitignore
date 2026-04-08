@@ -1,3 +1,6 @@
+# simpleRoboticArm 仓库忽略规则：通用构建产物 + catkin_ws 下由 catkin_make 生成的目录。
+# 目录说明见 setup_ros1.bash 顶部注释。
+#
 # Prerequisites
 *.d
 
@@ -53,3 +56,12 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# ROS 1 Catkin (build artifacts; keep catkin_ws/src/)
+catkin_ws/build/
+catkin_ws/devel/
+catkin_ws/install/
+catkin_ws/logs/
+
+# PlatformIO（simplerobotic/ 内另有 .gitignore）
+simplerobotic/.pio/
