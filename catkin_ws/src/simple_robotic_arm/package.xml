@@ -65,6 +65,7 @@
   <exec_depend>roslaunch</exec_depend>
   <!-- 串口桥接节点 esp32_serial_bridge.py -->
   <exec_depend>python3-serial</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

@@ -6,7 +6,74 @@
 
 **OmniRoam** 是一套围绕**三轮全向（全驱）底盘**与**车载机械臂**搭建的实验平台：支持平面**全向平移与旋转**（取决于轮系布局与控制）、**机械臂抓取**与小**货舱**作业、**遥控**，以及在有传感器与软件时的更高层**自主运行**。**x86 Linux 上位机**运行 **ROS 1**；**ESP32-S3** 经 **I2C** 连接电机控制板驱动执行机构，并经 **USB–UART** 与上位机交换数据。
 
-**Language / 语言:** [English ↓](#lang-en) · [简体中文 ↓](#lang-zh)
+<a id="repo-tree"></a>
+
+## 仓库目录结构
+
+```
+simpleRoboticArm/
+├── .gitignore
+├── LICENSE
+├── README.md
+├── setup_ros1.bash                 # 加载 Noetic + catkin_ws/devel
+├── setup_hostpc_ubuntu20.sh        # Ubuntu 20.04 上位机一键环境
+├── 3mf_printFile/                  # 3D 打印 .3mf
+├── catkin_ws/                      # ROS 1 Catkin 工作区
+│   ├── .catkin_workspace
+│   └── src/
+│       ├── CMakeLists.txt          # catkin 顶层（符号链接）
+│       └── simple_robotic_arm/
+│           ├── CMakeLists.txt
+│           ├── package.xml
+│           ├── include/simple_robotic_arm/
+│           ├── launch/
+│           │   └── esp32_serial_bridge.launch
+│           └── scripts/
+│               ├── esp32_serial_bridge.py
+│               ├── arm_kinematics.py
+│               └── chassis_kinematics.py
+├── RoboticArm_ESP32S3/             # ESP32-S3 PlatformIO 固件
+│   ├── .gitignore
+│   ├── platformio.ini
+│   ├── .vscode/
+│   ├── include/README
+│   ├── lib/README
+│   ├── test/README
+│   └── src/
+│       ├── main.cpp
+│       ├── PCA9685_Servo.cpp
+│       └── PCA9685_Servo.h
+└── RoboticArm_HostPC/              # 上位机 Web + Go
+    ├── .gitignore
+    ├── README.md
+    ├── start.sh
+    ├── server/
+    │   ├── go.mod
+    │   ├── go.sum
+    │   └── main.go
+    └── web/                        # Vue + Vite + Tailwind（pnpm）
+        ├── .env.example
+        ├── package.json
+        ├── pnpm-lock.yaml
+        ├── pnpm-workspace.yaml
+        ├── vite.config.ts
+        ├── tailwind.config.js
+        ├── postcss.config.js
+        ├── tsconfig.json
+        ├── index.html
+        ├── dist/                   # pnpm build 产物
+        └── src/
+            ├── main.ts
+            ├── App.vue
+            ├── style.css
+            └── vite-env.d.ts
+```
+
+未列出：`.git`、`catkin_ws/build`、`catkin_ws/devel`、`RoboticArm_ESP32S3/.pio`、`RoboticArm_HostPC/web/node_modules` 等生成或依赖目录。
+
+---
+
+**Language / 语言:** [目录结构 ↑](#repo-tree) · [English ↓](#lang-en) · [简体中文 ↓](#lang-zh)
 
 ---
 
@@ -14,7 +81,7 @@
 
 ## Documentation (English)
 
-Quick links: [Overview](#en-overview) · [Architecture](#en-architecture) · [Repository](#en-repo) · [Build & run](#en-dev) · [Status](#en-status) · [简体中文 →](#lang-zh)
+Quick links: [Tree](#repo-tree) · [Overview](#en-overview) · [Architecture](#en-architecture) · [Repository](#en-repo) · [Build & run](#en-dev) · [Status](#en-status) · [简体中文 →](#lang-zh)
 
 <a id="en-overview"></a>
 
@@ -74,12 +141,20 @@ USB camera (x86) ──► Web video (not through ESP32)
 | `catkin_ws/` | ROS 1 Catkin workspace; `build/` & `devel/` are usually local-only |
 | `catkin_ws/src/simple_robotic_arm/` | ROS package: `scripts/esp32_serial_bridge.py`, `launch/esp32_serial_bridge.launch`, … |
 | `RoboticArm_ESP32S3/` | ESP32-S3 firmware (e.g. PCA9685 / I2C servo demo) |
-| `RoboticArm_HostPC/` | Reserved for web UI, streaming, etc. (may be empty) |
+| `RoboticArm_HostPC/` | Host web UI: Vue + Tailwind (`web/`), Go server + WS (`server/`); see `RoboticArm_HostPC/README.md` |
+| `setup_hostpc_ubuntu20.sh` | **Ubuntu 20.04** fresh host: ROS Noetic, Go, Node/pnpm, `catkin_make`, dialout |
 | `LICENSE` | License |
 
 <a id="en-dev"></a>
 
 ### Development & run
+
+**New Ubuntu 20.04 host (Server/Desktop)**
+
+```bash
+cd /path/to/simpleRoboticArm
+bash setup_hostpc_ubuntu20.sh
+```
 
 **ROS (host)**
 
@@ -126,7 +201,7 @@ See `LICENSE` in the repo root.
 
 **返回英文:** [English documentation ↑](#lang-en)
 
-快速链接: [项目简介](#zh-overview) · [系统架构](#zh-architecture) · [仓库结构](#zh-repo) · [开发与运行](#zh-dev) · [实现状态](#zh-status)
+快速链接: [目录结构](#repo-tree) · [项目简介](#zh-overview) · [系统架构](#zh-architecture) · [仓库结构](#zh-repo) · [开发与运行](#zh-dev) · [实现状态](#zh-status)
 
 <a id="zh-overview"></a>
 
@@ -186,12 +261,20 @@ USB 摄像头（x86） ──► 网页视频（不经过 ESP32）
 | `catkin_ws/` | ROS 1 Catkin 工作区；`build/`、`devel/` 一般为本地生成，通常不提交 |
 | `catkin_ws/src/simple_robotic_arm/` | ROS 包：`scripts/esp32_serial_bridge.py`、`launch/esp32_serial_bridge.launch` 等 |
 | `RoboticArm_ESP32S3/` | ESP32-S3 固件（含 PCA9685 / I2C 舵机示例） |
-| `RoboticArm_HostPC/` | 预留：网页、视频推流等（当前可为空，由你自行添加） |
+| `RoboticArm_HostPC/` | 上位机控制台：Vue + Tailwind（`web/`）、Go + WebSocket（`server/`），见 `RoboticArm_HostPC/README.md` |
+| `setup_hostpc_ubuntu20.sh` | **Ubuntu 20.04** 新上位机一键装：Noetic、Go、Node/pnpm、`catkin_make`、串口组 |
 | `LICENSE` | 许可证 |
 
 <a id="zh-dev"></a>
 
 ### 开发与运行
+
+**全新 Ubuntu 20.04 上位机**
+
+```bash
+cd /path/to/simpleRoboticArm
+bash setup_hostpc_ubuntu20.sh
+```
 
 **ROS（上位机）**
 
