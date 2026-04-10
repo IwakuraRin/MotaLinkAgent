@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { t, locale } from './i18n'
+import { t, locale, setLocale, type Locale } from './i18n'
 import { emptyEdgeLogMap, isTopologyEdgeId, type TopologyEdgeId } from './topology'
 import FloatingLogWindow from './components/FloatingLogWindow.vue'
 import HostTopologyGraph from './components/HostTopologyGraph.vue'
 import WebDesktopRoot from './components/desktop/WebDesktopRoot.vue'
-import SettingsFormBody from './components/SettingsFormBody.vue'
 
 const LS_CAMERA = 'omniroam.camera_url'
 const LS_MAXLOG = 'omniroam.console_max_lines'
 const LS_KEYBOARD = 'omniroam.keyboard_enabled'
 const LS_PWD_DISMISS = 'omniroam.pwd_dismiss'
-const SS_GIT_DISMISS = 'omniroam.git_dismiss_remote_sha'
+const LS_UPDATE_DISMISS = 'omniroam.update.dismiss_remote_sha'
+const UPDATE_POLL_MS = 10 * 60 * 1000
 
 function apiFetch(input: string, init?: RequestInit) {
   return fetch(input, { ...init, credentials: 'include' })
@@ -34,6 +34,169 @@ const pwdBusy = ref(false)
 const pwdNudgeDismissed = ref(
   typeof sessionStorage !== 'undefined' && sessionStorage.getItem(LS_PWD_DISMISS) === '1',
 )
+
+type UpdateStatusPayload = {
+  enabled: boolean
+  update_available?: boolean
+  local_sha?: string
+  remote_sha?: string
+  branch?: string
+  changelog?: string
+  changelog_ok?: boolean
+  changelog_error?: string
+  git_error?: string
+  reason?: string
+}
+
+const updateStatus = ref<UpdateStatusPayload | null>(null)
+const updateModal = ref<'off' | 'prompt' | 'countdown' | 'deploying'>('off')
+const updateCountdown = ref(10)
+const updateDeployOutput = ref('')
+const updateDeployBusy = ref(false)
+let updatePollHandle: ReturnType<typeof setInterval> | null = null
+let updateCountdownHandle: ReturnType<typeof setInterval> | null = null
+
+function shortGitSha(s: string | undefined) {
+  if (!s) return '—'
+  return s.length > 7 ? s.slice(0, 7) : s
+}
+
+const updateShasLine = computed(() => {
+  const st = updateStatus.value
+  if (!st) return ''
+  return t('update.shas')
+    .replace('{{local}}', shortGitSha(st.local_sha))
+    .replace('{{remote}}', shortGitSha(st.remote_sha))
+    .replace('{{branch}}', st.branch || 'main')
+})
+
+function dismissUpdateForRemoteSha() {
+  const sha = updateStatus.value?.remote_sha
+  if (sha && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(LS_UPDATE_DISMISS, sha)
+  }
+}
+
+function maybeOpenUpdateModal(st: UpdateStatusPayload) {
+  if (updateModal.value !== 'off') return
+  if (!st.enabled || !st.update_available || !st.remote_sha) return
+  if (typeof sessionStorage !== 'undefined') {
+    if (sessionStorage.getItem(LS_UPDATE_DISMISS) === st.remote_sha) return
+  }
+  updateModal.value = 'prompt'
+}
+
+async function pollUpdateStatus() {
+  if (!loggedIn.value) return
+  try {
+    const r = await apiFetch('/api/updates/status')
+    if (r.status === 401) {
+      loggedIn.value = false
+      return
+    }
+    if (!r.ok) return
+    const st = (await r.json()) as UpdateStatusPayload
+    updateStatus.value = st
+    maybeOpenUpdateModal(st)
+  } catch {
+    /* offline / dev */
+  }
+}
+
+function startUpdatePolling() {
+  stopUpdatePolling()
+  void pollUpdateStatus()
+  updatePollHandle = setInterval(() => void pollUpdateStatus(), UPDATE_POLL_MS)
+}
+
+function stopUpdatePolling() {
+  if (updatePollHandle) {
+    clearInterval(updatePollHandle)
+    updatePollHandle = null
+  }
+}
+
+function clearUpdateCountdown() {
+  if (updateCountdownHandle) {
+    clearInterval(updateCountdownHandle)
+    updateCountdownHandle = null
+  }
+}
+
+function laterUpdatePrompt() {
+  dismissUpdateForRemoteSha()
+  updateModal.value = 'off'
+}
+
+function beginUpdateCountdown() {
+  updateModal.value = 'countdown'
+  clearUpdateCountdown()
+  updateCountdown.value = 10
+  updateCountdownHandle = setInterval(() => {
+    updateCountdown.value--
+    if (updateCountdown.value <= 0) {
+      updateCountdown.value = 0
+      clearUpdateCountdown()
+    }
+  }, 1000)
+}
+
+function cancelUpdateFlow() {
+  clearUpdateCountdown()
+  updateModal.value = 'off'
+  dismissUpdateForRemoteSha()
+}
+
+function closeDeployModal() {
+  updateModal.value = 'off'
+  updateDeployOutput.value = ''
+}
+
+const updateCountdownWaitText = computed(() =>
+  t('update.countdownWait').replace('{{n}}', String(updateCountdown.value)),
+)
+
+async function runDeployUpdate() {
+  updateDeployBusy.value = true
+  updateDeployOutput.value = ''
+  updateModal.value = 'deploying'
+  try {
+    const r = await apiFetch('/api/updates/apply', { method: 'POST' })
+    const j = (await r.json().catch(() => ({}))) as {
+      ok?: boolean
+      output?: string
+      error?: string
+      exit_code?: number
+    }
+    const out = typeof j.output === 'string' ? j.output : ''
+    if (r.status === 409) {
+      updateDeployOutput.value = t('update.busy')
+    } else if (r.status === 400) {
+      const err = typeof j.error === 'string' ? j.error : ''
+      updateDeployOutput.value = `${err}\n${out}\n\n${t('update.deployFail')}`
+    } else if (!r.ok) {
+      updateDeployOutput.value = `HTTP ${r.status}\n\n${t('update.deployFail')}`
+    } else if (j.ok) {
+      updateDeployOutput.value = `${out}\n\n${t('update.deployOk')}`
+      dismissUpdateForRemoteSha()
+    } else {
+      updateDeployOutput.value = `${out}\n\n${t('update.deployFail')}`
+    }
+  } catch (e) {
+    updateDeployOutput.value = `${String(e)}\n\n${t('update.deployFail')}`
+  } finally {
+    updateDeployBusy.value = false
+  }
+}
+
+function onUpdateBackdrop() {
+  if (updateModal.value === 'prompt') {
+    dismissUpdateForRemoteSha()
+    updateModal.value = 'off'
+  } else if (updateModal.value === 'countdown') {
+    cancelUpdateFlow()
+  }
+}
 
 const mainTab = ref<'console' | 'desktop'>(
   typeof sessionStorage !== 'undefined' && sessionStorage.getItem('omniroam.main_tab') === 'desktop'
@@ -58,7 +221,6 @@ const keysHeld = ref<Record<string, boolean>>({})
 const lastCmd = ref('')
 
 const settingsOpen = ref(false)
-const settingsModalOpen = ref(false)
 const settingsCameraDraft = ref('')
 const appliedCameraUrl = ref('')
 const maxLogLines = ref(500)
@@ -71,135 +233,6 @@ const serialRolesDraft = ref<Record<SerialRoleKey, string>>({
   esp32_uart: '',
   aux_serial: '',
 })
-
-type GitUpdatePhase = 'idle' | 'invite' | 'countdown' | 'pulling' | 'done' | 'error'
-const gitUpdatePhase = ref<GitUpdatePhase>('idle')
-const gitCountdown = ref(10)
-const gitBehindInfo = ref<{
-  remote_sha: string
-  local_sha: string
-  branch: string
-  remote_url: string
-} | null>(null)
-const gitPullDetail = ref('')
-let gitCountdownTimer: ReturnType<typeof setInterval> | null = null
-let gitPollTimer: ReturnType<typeof setInterval> | null = null
-
-function clearGitCountdown() {
-  if (gitCountdownTimer) {
-    clearInterval(gitCountdownTimer)
-    gitCountdownTimer = null
-  }
-}
-
-async function checkGitRepoUpdate() {
-  if (!loggedIn.value) return
-  if (gitUpdatePhase.value !== 'idle') return
-  try {
-    const r = await apiFetch('/api/repo/status')
-    if (r.status === 401) return
-    if (!r.ok) return
-    const j = (await r.json()) as {
-      ok?: boolean
-      behind?: boolean
-      remote_sha?: string
-      local_sha?: string
-      branch?: string
-      remote_url?: string
-      fetch_ok?: boolean
-      fetch_error?: string
-    }
-    if (!j.ok || !j.behind || !j.remote_sha) return
-    if (typeof sessionStorage !== 'undefined') {
-      const dismissed = sessionStorage.getItem(SS_GIT_DISMISS)
-      if (dismissed === j.remote_sha) return
-    }
-    gitBehindInfo.value = {
-      remote_sha: j.remote_sha,
-      local_sha: typeof j.local_sha === 'string' ? j.local_sha : '',
-      branch: typeof j.branch === 'string' ? j.branch : '',
-      remote_url: typeof j.remote_url === 'string' ? j.remote_url : '',
-    }
-    gitUpdatePhase.value = 'invite'
-  } catch {
-    /* ignore */
-  }
-}
-
-function dismissGitInvite() {
-  if (gitBehindInfo.value?.remote_sha && typeof sessionStorage !== 'undefined') {
-    sessionStorage.setItem(SS_GIT_DISMISS, gitBehindInfo.value.remote_sha)
-  }
-  gitUpdatePhase.value = 'idle'
-  gitBehindInfo.value = null
-}
-
-function confirmGitInviteProceed() {
-  clearGitCountdown()
-  gitCountdown.value = 10
-  gitUpdatePhase.value = 'countdown'
-  gitPullDetail.value = ''
-  gitCountdownTimer = setInterval(() => {
-    gitCountdown.value -= 1
-    if (gitCountdown.value <= 0) {
-      clearGitCountdown()
-      void runGitPull()
-    }
-  }, 1000)
-}
-
-function cancelGitCountdown() {
-  clearGitCountdown()
-  gitUpdatePhase.value = 'idle'
-}
-
-async function runGitPull() {
-  clearGitCountdown()
-  gitUpdatePhase.value = 'pulling'
-  gitPullDetail.value = ''
-  try {
-    const r = await apiFetch('/api/repo/pull', { method: 'POST' })
-    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; detail?: string; message?: string }
-    if (!r.ok) {
-      gitPullDetail.value = typeof j.detail === 'string' ? j.detail : t('gitUpdate.pullFail')
-      gitUpdatePhase.value = 'error'
-      ingestLog(`WARN  ${t('gitUpdate.logPullFail')}`, 'e_http_api')
-      return
-    }
-    gitPullDetail.value = typeof j.message === 'string' ? j.message : ''
-    gitUpdatePhase.value = 'done'
-    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(SS_GIT_DISMISS)
-    ingestLog(t('gitUpdate.logPullOk'), 'e_http_api')
-  } catch {
-    gitUpdatePhase.value = 'error'
-    gitPullDetail.value = t('gitUpdate.pullFail')
-  }
-}
-
-function closeGitUpdateModal() {
-  gitUpdatePhase.value = 'idle'
-  gitBehindInfo.value = null
-  gitPullDetail.value = ''
-}
-
-function openSettingsDrawer() {
-  settingsModalOpen.value = false
-  settingsOpen.value = true
-}
-
-function openSettingsModal() {
-  settingsOpen.value = false
-  settingsModalOpen.value = true
-}
-
-function closeAllSettings() {
-  settingsOpen.value = false
-  settingsModalOpen.value = false
-}
-
-function onGitBackdropInviteOnly() {
-  if (gitUpdatePhase.value === 'invite') dismissGitInvite()
-}
 
 const envCamera = (import.meta.env.VITE_CAMERA_URL as string | undefined)?.trim() || ''
 
@@ -276,7 +309,7 @@ function onKeyEv(e: KeyboardEvent, down: boolean) {
   if (!loggedIn.value) return
   if (mainTab.value !== 'console') return
   if (!keyboardEnabled.value) return
-  if ((settingsOpen.value || settingsModalOpen.value) && down) return
+  if (settingsOpen.value && down) return
   const k = e.key.toLowerCase()
   const map = ['w', 'a', 's', 'd', 'q', 'e']
   if (!map.includes(k)) return
@@ -386,11 +419,9 @@ async function checkSession() {
 async function bootAfterAuth() {
   await hydrateAppliedCameraUrl()
   connectWs()
+  startUpdatePolling()
   await nextTick()
   bindCamera()
-  void checkGitRepoUpdate()
-  if (gitPollTimer) clearInterval(gitPollTimer)
-  gitPollTimer = setInterval(() => void checkGitRepoUpdate(), 5 * 60 * 1000)
 }
 
 async function submitLogin() {
@@ -451,13 +482,9 @@ async function submitLogout() {
   authUsername.value = ''
   mustChangePassword.value = false
   pwdModal.value = 'off'
-  clearGitCountdown()
-  if (gitPollTimer) {
-    clearInterval(gitPollTimer)
-    gitPollTimer = null
-  }
-  gitUpdatePhase.value = 'idle'
-  gitBehindInfo.value = null
+  stopUpdatePolling()
+  clearUpdateCountdown()
+  updateModal.value = 'off'
 }
 
 async function submitChangePassword() {
@@ -606,6 +633,22 @@ async function loadSettingsPanelData() {
   await refreshSerialDevices()
 }
 
+function deviceLabel(d: SerialDev): string {
+  if (d.target && d.target !== d.path) return `${d.path} → ${d.target}`
+  return d.path
+}
+
+function serialRoleTitle(role: SerialRoleKey): string {
+  if (role === 'esp32_uart') return t('serial.role.esp32_uart')
+  if (role === 'aux_serial') return t('serial.role.aux_serial')
+  return role
+}
+
+function onLangChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value as Locale
+  if (v === 'en' || v === 'zh' || v === 'ko') setLocale(v)
+}
+
 async function saveSettings() {
   const url = settingsCameraDraft.value.trim()
   appliedCameraUrl.value = url
@@ -633,7 +676,7 @@ async function saveSettings() {
   localStorage.setItem(LS_MAXLOG, String(maxLogLines.value))
   await nextTick()
   bindCamera()
-  closeAllSettings()
+  settingsOpen.value = false
 }
 
 function clearStoredCamera() {
@@ -643,8 +686,8 @@ function clearStoredCamera() {
   void saveSettings()
 }
 
-watch([settingsOpen, settingsModalOpen], ([drawer, modal]) => {
-  if (drawer || modal) {
+watch(settingsOpen, (open) => {
+  if (open) {
     settingsCameraDraft.value = appliedCameraUrl.value
     void loadSettingsPanelData()
   }
@@ -681,11 +724,8 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onWindowKeyDown)
   window.removeEventListener('keyup', onWindowKeyUp)
   if (reconnectTimer) clearTimeout(reconnectTimer)
-  clearGitCountdown()
-  if (gitPollTimer) {
-    clearInterval(gitPollTimer)
-    gitPollTimer = null
-  }
+  stopUpdatePolling()
+  clearUpdateCountdown()
   wsAllowReconnect = false
   try {
     ws?.close()
@@ -768,7 +808,7 @@ const statusColor = computed(() => {
         <button
           type="button"
           class="rounded border border-pve-border bg-pve-panel px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-pve-text shadow hover:bg-pve-header"
-          @click="openSettingsDrawer"
+          @click="settingsOpen = true"
         >
           {{ t('settings.btn') }}
         </button>
@@ -845,7 +885,7 @@ const statusColor = computed(() => {
         v-show="settingsOpen"
         class="fixed inset-0 z-[100] flex justify-end bg-black/50"
         role="presentation"
-        @click.self="closeAllSettings"
+        @click.self="settingsOpen = false"
       >
         <aside
           class="flex h-full w-full max-w-md flex-col border-l border-pve-border bg-pve-panel shadow-2xl"
@@ -858,169 +898,145 @@ const statusColor = computed(() => {
             <button
               type="button"
               class="rounded px-2 py-1 text-xs text-pve-muted hover:bg-pve-border hover:text-white"
-              @click="closeAllSettings"
+              @click="settingsOpen = false"
             >
               {{ t('settings.close') }}
             </button>
           </div>
-          <SettingsFormBody
-            v-model:camera-url="settingsCameraDraft"
-            v-model:serial-roles-draft="serialRolesDraft"
-            v-model:max-log-lines="maxLogLines"
-            v-model:keyboard-enabled="keyboardEnabled"
-            :locale-val="locale"
-            :serial-devices="serialDevices"
-            :serial-list-loading="serialListLoading"
-            :host-os="serialHostOS"
-            @save="saveSettings"
-            @clear-camera="clearStoredCamera"
-            @refresh-serial="refreshSerialDevices"
-            @reconnect-ws="reconnectWebSocket"
-          />
+          <div class="min-h-0 flex-1 overflow-y-auto p-4 text-sm">
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">
+                {{ t('settings.langSection') }}
+              </h3>
+              <label class="mb-1 block text-xs text-pve-muted">{{ t('settings.langLabel') }}</label>
+              <select
+                class="w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text focus:border-pve-accent focus:outline-none"
+                :value="locale"
+                @change="onLangChange"
+              >
+                <option value="en">{{ t('settings.lang.en') }}</option>
+                <option value="zh">{{ t('settings.lang.zh') }}</option>
+                <option value="ko">{{ t('settings.lang.ko') }}</option>
+              </select>
+            </section>
+
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('video.section') }}</h3>
+              <label class="mb-1 block text-xs text-pve-muted">{{ t('video.label') }}</label>
+              <textarea
+                v-model="settingsCameraDraft"
+                rows="3"
+                class="mb-2 w-full resize-y rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text placeholder:text-pve-muted focus:border-pve-accent focus:outline-none"
+                :placeholder="t('video.placeholder')"
+              />
+              <p class="mb-3 text-xs leading-relaxed text-pve-muted">
+                {{ t('video.hint') }}
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
+                  @click="saveSettings"
+                >
+                  {{ t('video.saveApply') }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-muted hover:text-pve-warn"
+                  @click="clearStoredCamera"
+                >
+                  {{ t('video.clearUrl') }}
+                </button>
+              </div>
+            </section>
+
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('serial.section') }}</h3>
+              <div class="mb-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs font-semibold text-pve-text hover:bg-pve-header"
+                  :disabled="serialListLoading"
+                  @click="refreshSerialDevices"
+                >
+                  {{ serialListLoading ? t('serial.scanning') : t('serial.refresh') }}
+                </button>
+                <span class="font-mono text-[10px] text-pve-muted">OS: {{ serialHostOS || '—' }}</span>
+              </div>
+              <p v-if="serialHostOS && serialHostOS !== 'linux'" class="mb-3 text-xs text-pve-warn">
+                {{ t('serial.nonlinux') }}
+              </p>
+              <p class="mb-3 text-xs leading-relaxed text-pve-muted">{{ t('serial.hint') }}</p>
+
+              <div
+                v-for="role in SERIAL_ROLE_KEYS"
+                :key="role"
+                class="mb-3"
+              >
+                <label class="mb-1 block text-xs text-pve-muted">{{ serialRoleTitle(role) }}</label>
+                <select
+                  v-model="serialRolesDraft[role]"
+                  class="w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-[11px] text-pve-text focus:border-pve-accent focus:outline-none"
+                >
+                  <option value="">{{ t('serial.unassigned') }}</option>
+                  <option
+                    v-for="d in serialDevices"
+                    :key="role + d.path"
+                    :value="d.path"
+                  >
+                    {{ deviceLabel(d) }}
+                  </option>
+                </select>
+              </div>
+              <p
+                v-if="serialHostOS === 'linux' && !serialListLoading && serialDevices.length === 0"
+                class="text-xs text-pve-warn"
+              >
+                {{ t('serial.emptyList') }}
+              </p>
+            </section>
+
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('conn.section') }}</h3>
+              <button
+                type="button"
+                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs font-semibold text-pve-text hover:bg-pve-header"
+                @click="reconnectWebSocket"
+              >
+                {{ t('conn.reconnectWs') }}
+              </button>
+              <p class="mt-2 text-xs text-pve-muted">{{ t('conn.hint') }}</p>
+            </section>
+
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('ctrl.section') }}</h3>
+              <label class="flex cursor-pointer items-center gap-2 text-xs text-pve-text">
+                <input v-model="keyboardEnabled" type="checkbox" class="accent-pve-accent" />
+                {{ t('ctrl.keyboard') }}
+              </label>
+              <p class="mt-2 text-xs text-pve-muted">{{ t('ctrl.hint') }}</p>
+            </section>
+
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('disp.section') }}</h3>
+              <label class="mb-1 block text-xs text-pve-muted">{{ t('disp.logBuffer') }}</label>
+              <input
+                v-model.number="maxLogLines"
+                type="number"
+                min="50"
+                max="5000"
+                class="w-full rounded border border-pve-border bg-pve-bg px-2 py-1 font-mono text-xs text-pve-text focus:border-pve-accent focus:outline-none"
+              />
+            </section>
+
+            <section class="rounded border border-dashed border-pve-border bg-pve-bg/80 p-3">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('ros.section') }}</h3>
+              <p class="text-xs leading-relaxed text-pve-muted">
+                {{ t('ros.body') }}
+              </p>
+            </section>
+          </div>
         </aside>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div
-        v-show="settingsModalOpen"
-        class="fixed inset-0 z-[140] flex items-center justify-center bg-black/55 p-4"
-        role="presentation"
-        @click.self="closeAllSettings"
-      >
-        <div
-          class="flex max-h-[min(90vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded border border-pve-border bg-pve-panel shadow-2xl"
-          role="dialog"
-          :aria-label="t('settings.titleModal')"
-          @click.stop
-        >
-          <div class="flex shrink-0 items-center justify-between border-b border-pve-border bg-pve-header px-3 py-2">
-            <span class="text-xs font-semibold uppercase tracking-wide text-pve-text">{{ t('settings.titleModal') }}</span>
-            <button
-              type="button"
-              class="rounded px-2 py-1 text-xs text-pve-muted hover:bg-pve-border hover:text-white"
-              @click="closeAllSettings"
-            >
-              {{ t('settings.close') }}
-            </button>
-          </div>
-          <SettingsFormBody
-            v-model:camera-url="settingsCameraDraft"
-            v-model:serial-roles-draft="serialRolesDraft"
-            v-model:max-log-lines="maxLogLines"
-            v-model:keyboard-enabled="keyboardEnabled"
-            :locale-val="locale"
-            :serial-devices="serialDevices"
-            :serial-list-loading="serialListLoading"
-            :host-os="serialHostOS"
-            @save="saveSettings"
-            @clear-camera="clearStoredCamera"
-            @refresh-serial="refreshSerialDevices"
-            @reconnect-ws="reconnectWebSocket"
-          />
-        </div>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div
-        v-if="gitUpdatePhase !== 'idle'"
-        class="fixed inset-0 z-[180] flex items-center justify-center bg-black/60 p-4"
-        role="presentation"
-        @click.self="onGitBackdropInviteOnly"
-      >
-        <div
-          class="w-full max-w-md rounded border border-pve-border bg-pve-panel p-5 shadow-2xl"
-          role="alertdialog"
-          @click.stop
-        >
-          <template v-if="gitUpdatePhase === 'invite' && gitBehindInfo">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('gitUpdate.title') }}</h2>
-            <p class="mb-3 text-xs leading-relaxed text-pve-muted">{{ t('gitUpdate.body') }}</p>
-            <p class="mb-1 font-mono text-[10px] text-pve-muted">{{ t('gitUpdate.branch') }} {{ gitBehindInfo.branch }}</p>
-            <p class="mb-3 break-all font-mono text-[10px] text-pve-muted">{{ gitBehindInfo.remote_url }}</p>
-            <div class="mt-4 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="dismissGitInvite"
-              >
-                {{ t('gitUpdate.later') }}
-              </button>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-                @click="confirmGitInviteProceed"
-              >
-                {{ t('gitUpdate.proceed') }}
-              </button>
-            </div>
-          </template>
-
-          <template v-else-if="gitUpdatePhase === 'countdown'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('gitUpdate.countdownTitle') }}</h2>
-            <p class="mb-4 text-xs leading-relaxed text-pve-muted">
-              {{ t('gitUpdate.countdownLead') }}
-              <strong class="font-mono text-white">{{ gitCountdown }}</strong>
-              {{ t('gitUpdate.countdownSuffix') }}
-            </p>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="cancelGitCountdown"
-              >
-                {{ t('gitUpdate.cancel') }}
-              </button>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-                @click="clearGitCountdown(); void runGitPull()"
-              >
-                {{ t('gitUpdate.pullNow') }}
-              </button>
-            </div>
-          </template>
-
-          <template v-else-if="gitUpdatePhase === 'pulling'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('gitUpdate.pulling') }}</h2>
-            <p class="text-xs text-pve-muted">{{ t('gitUpdate.pullingHint') }}</p>
-          </template>
-
-          <template v-else-if="gitUpdatePhase === 'done'">
-            <h2 class="mb-2 text-sm font-semibold text-pve-ok">{{ t('gitUpdate.doneTitle') }}</h2>
-            <p class="mb-3 text-xs leading-relaxed text-pve-muted">{{ t('gitUpdate.doneBody') }}</p>
-            <pre
-              v-if="gitPullDetail"
-              class="mb-3 max-h-32 overflow-auto rounded border border-pve-border bg-pve-bg p-2 font-mono text-[10px] text-pve-text"
-            >{{ gitPullDetail }}</pre>
-            <div class="flex justify-end">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-                @click="closeGitUpdateModal"
-              >
-                {{ t('gitUpdate.close') }}
-              </button>
-            </div>
-          </template>
-
-          <template v-else-if="gitUpdatePhase === 'error'">
-            <h2 class="mb-2 text-sm font-semibold text-pve-err">{{ t('gitUpdate.errorTitle') }}</h2>
-            <pre
-              class="mb-3 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded border border-pve-border bg-pve-bg p-2 font-mono text-[10px] text-pve-warn"
-            >{{ gitPullDetail }}</pre>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="closeGitUpdateModal"
-              >
-                {{ t('gitUpdate.close') }}
-              </button>
-            </div>
-          </template>
-        </div>
       </div>
     </Teleport>
 
@@ -1057,7 +1073,7 @@ const statusColor = computed(() => {
             </div>
           </section>
 
-          <HostTopologyGraph :edge-logs="edgeLogs" @open-settings-modal="openSettingsModal" />
+          <HostTopologyGraph :edge-logs="edgeLogs" />
         </div>
 
         <footer
@@ -1098,7 +1114,7 @@ const statusColor = computed(() => {
         </footer>
       </template>
 
-      <WebDesktopRoot v-else :log-lines="consoleLines" @open-settings="openSettingsDrawer" />
+      <WebDesktopRoot v-else :log-lines="consoleLines" @open-settings="settingsOpen = true" />
     </div>
 
     <FloatingLogWindow :lines="consoleLines" />
@@ -1181,6 +1197,102 @@ const statusColor = computed(() => {
                 {{ pwdBusy ? t('auth.busy') : t('auth.submit') }}
               </button>
             </div>
+          </template>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="loggedIn && updateModal !== 'off'"
+        class="fixed inset-0 z-[210] flex items-center justify-center bg-black/65 p-4"
+        role="presentation"
+        @click.self="onUpdateBackdrop"
+      >
+        <div
+          class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded border border-pve-border bg-pve-panel p-5 shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          @click.stop
+        >
+          <template v-if="updateModal === 'prompt'">
+            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('update.title') }}</h2>
+            <p class="mb-2 text-xs leading-relaxed text-pve-muted">{{ t('update.available') }}</p>
+            <p class="mb-3 font-mono text-[11px] text-pve-accent2">{{ updateShasLine }}</p>
+            <h3 class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-pve-muted">
+              {{ t('update.changelog') }}
+            </h3>
+            <pre
+              v-if="updateStatus?.changelog && updateStatus.changelog.trim()"
+              class="mb-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-pve-border bg-pve-bg p-2 font-mono text-[11px] text-pve-text"
+              >{{ updateStatus.changelog }}</pre>
+            <p v-else class="mb-3 font-mono text-[11px] text-pve-muted">{{ t('update.noChangelog') }}</p>
+            <p v-if="updateStatus?.changelog_error" class="mb-2 font-mono text-[11px] text-pve-warn">
+              {{ t('update.changelogFetchErr') }} {{ updateStatus.changelog_error }}
+            </p>
+            <p v-if="updateStatus?.git_error" class="mb-3 font-mono text-[11px] text-pve-warn">
+              {{ t('update.gitErr') }} {{ updateStatus.git_error }}
+            </p>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
+                @click="
+                  dismissUpdateForRemoteSha();
+                  updateModal = 'off'
+                "
+              >
+                {{ t('update.later') }}
+              </button>
+              <button
+                type="button"
+                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
+                @click="beginUpdateCountdown"
+              >
+                {{ t('update.confirm') }}
+              </button>
+            </div>
+          </template>
+
+          <template v-else-if="updateModal === 'countdown'">
+            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('update.countdownTitle') }}</h2>
+            <p class="mb-2 text-xs leading-relaxed text-pve-muted">{{ t('update.countdownBody') }}</p>
+            <p class="mb-1 text-sm font-semibold text-amber-100/95">{{ t('update.sureQuestion') }}</p>
+            <p class="mb-4 font-mono text-xs text-pve-muted">{{ updateCountdownWaitText }}</p>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
+                @click="cancelUpdateFlow"
+              >
+                {{ t('update.cancel') }}
+              </button>
+              <button
+                type="button"
+                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent disabled:opacity-40"
+                :disabled="updateCountdown > 0"
+                @click="runDeployUpdate"
+              >
+                {{ t('update.startDeploy') }}
+              </button>
+            </div>
+          </template>
+
+          <template v-else-if="updateModal === 'deploying'">
+            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('update.title') }}</h2>
+            <p v-if="updateDeployBusy" class="mb-2 text-xs text-pve-muted">{{ t('update.deploying') }}</p>
+            <pre
+              class="mb-3 max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-pve-border bg-black/40 p-2 font-mono text-[10px] text-pve-text"
+              >{{ updateDeployOutput }}</pre
+            >
+            <button
+              v-if="!updateDeployBusy"
+              type="button"
+              class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
+              @click="closeDeployModal"
+            >
+              {{ t('settings.close') }}
+            </button>
           </template>
         </div>
       </div>

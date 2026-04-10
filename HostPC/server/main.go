@@ -159,13 +159,12 @@ func main() {
 	mysqlDSN := flag.String("mysql-dsn", "", "MySQL DSN (overrides env MYSQL_DSN); use with production MySQL")
 	sqliteUsers := flag.String("sqlite-users", "", "SQLite file for web users (dev/LAN without MySQL); overrides HOSTPC_SQLITE_USERS env")
 	authSecretPath := flag.String("auth-secret", "hostpc-auth-secret", "file holding 32-byte session signing key (created if missing); override with AUTH_SECRET env")
-	gitRepo := flag.String("git-repo", "", "git repository root for /api/repo/* update checks (default: walk up from cwd for .git)")
+	githubSlug := flag.String("github-repo", strings.TrimSpace(os.Getenv("HOSTPC_GITHUB_REPO")), "owner/name — CHANGELOG fetched from raw.githubusercontent.com (optional)")
+	repoRoot := flag.String("repo-root", strings.TrimSpace(os.Getenv("HOSTPC_REPO_ROOT")), "local git clone root for fetch/compare and self-update")
+	ghBranch := flag.String("github-branch", strings.TrimSpace(os.Getenv("HOSTPC_GITHUB_BRANCH")), "remote branch to track (default main)")
+	changelogPath := flag.String("changelog", strings.TrimSpace(os.Getenv("HOSTPC_CHANGELOG_PATH")), "changelog file path in GitHub repo (default CHANGELOG.md)")
+	updateScriptFlag := flag.String("update-script", strings.TrimSpace(os.Getenv("HOSTPC_UPDATE_SCRIPT")), "self-update bash script (default: <repo-root>/HostPC/deploy/hostpc-self-update.sh)")
 	flag.Parse()
-
-	hostGitRepoRoot = resolveGitRepoRoot(*gitRepo)
-	if hostGitRepoRoot != "" {
-		log.Printf("Git repo for updates: %s", hostGitRepoRoot)
-	}
 
 	st, err := os.Stat(*staticDir)
 	if err != nil || !st.IsDir() {
@@ -321,8 +320,29 @@ func main() {
 
 	mux.HandleFunc("/api/fs/list", ar.requireAuth(handleFSList))
 
-	mux.HandleFunc("/api/repo/status", ar.requireAuth(handleRepoStatus))
-	mux.HandleFunc("/api/repo/pull", ar.requireAuth(handleRepoPull))
+	branch := strings.TrimSpace(*ghBranch)
+	if branch == "" {
+		branch = "main"
+	}
+	changelogRel := strings.TrimSpace(*changelogPath)
+	if changelogRel == "" {
+		changelogRel = "CHANGELOG.md"
+	}
+	updateScriptPath := strings.TrimSpace(*updateScriptFlag)
+	repoRootTrim := strings.TrimSpace(*repoRoot)
+	if updateScriptPath == "" && repoRootTrim != "" {
+		updateScriptPath = filepath.Join(repoRootTrim, "HostPC", "deploy", "hostpc-self-update.sh")
+	}
+	uc := &updateConfig{
+		h:             h,
+		RepoRoot:      repoRootTrim,
+		GithubSlug:    strings.TrimSpace(*githubSlug),
+		Branch:        branch,
+		ChangelogPath: changelogRel,
+		ScriptPath:    updateScriptPath,
+	}
+	mux.HandleFunc("/api/updates/status", ar.requireAuth(uc.handleStatus))
+	mux.HandleFunc("/api/updates/apply", ar.requireAuth(uc.handleApply))
 
 	mux.HandleFunc("/api/serial/devices", ar.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

@@ -7,10 +7,6 @@ const props = defineProps<{
   edgeLogs: Record<string, string[]>
 }>()
 
-const emit = defineEmits<{
-  openSettingsModal: []
-}>()
-
 const VB_W = 920
 const VB_H = 460
 
@@ -129,10 +125,6 @@ function onNodePointerMove(e: PointerEvent) {
   nodes.value = list
 }
 
-function onNodeDblClick(n: NodeDef) {
-  if (n.id === 'settings_file') emit('openSettingsModal')
-}
-
 function onNodePointerDown(e: PointerEvent, n: NodeDef) {
   if (e.button !== 0) return
   e.stopPropagation()
@@ -227,14 +219,14 @@ function edgeGeometry(e: EdgeDef, nm: Record<string, NodeDef>) {
   return { d, mid }
 }
 
-const PANEL_W = 176
-const PANEL_H = 112
-const DOT_HIT_R = 14
-const DOT_VIS_R = 5
+const PANEL_W = 180
+const PANEL_H = 120
+const BTN_W = 48
+const BTN_H = 22
 
 function panelPosition(mid: { x: number; y: number }) {
   let x = mid.x - PANEL_W / 2
-  let y = mid.y - PANEL_H / 2 - 18
+  let y = mid.y - PANEL_H / 2 - 24
   x = Math.max(6, Math.min(VB_W - PANEL_W - 6, x))
   y = Math.max(6, Math.min(VB_H - PANEL_H - 6, y))
   return { x, y }
@@ -302,24 +294,15 @@ onUnmounted(() => {
 
 <template>
   <div class="flex min-h-0 min-w-0 flex-1 flex-col border-pve-border bg-pve-bg lg:border-l">
-    <div class="pve-panel-title flex flex-wrap items-center justify-between gap-2 pr-2">
+    <div class="pve-panel-title flex items-center justify-between gap-2 pr-2">
       <span>{{ t('graph.title') }}</span>
-      <div class="flex shrink-0 flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          class="rounded border border-pve-border bg-pve-panel px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pve-text hover:bg-pve-header"
-          @click="emit('openSettingsModal')"
-        >
-          {{ t('graph.settingsModal') }}
-        </button>
-        <button
-          type="button"
-          class="rounded border border-pve-border bg-pve-panel px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pve-text hover:bg-pve-header"
-          @click="applyAutoLayout"
-        >
-          {{ t('graph.autoLayout') }}
-        </button>
-      </div>
+      <button
+        type="button"
+        class="shrink-0 rounded border border-pve-border bg-pve-panel px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pve-text hover:bg-pve-header"
+        @click="applyAutoLayout"
+      >
+        {{ t('graph.autoLayout') }}
+      </button>
     </div>
     <div class="relative min-h-[440px] flex-1 overflow-auto bg-[#222] p-2">
       <svg
@@ -351,7 +334,6 @@ onUnmounted(() => {
           :key="n.id"
           class="cursor-grab"
           @pointerdown="(ev) => onNodePointerDown(ev, n)"
-          @dblclick.stop="onNodeDblClick(n)"
         >
           <rect
             :x="n.x"
@@ -376,37 +358,25 @@ onUnmounted(() => {
           </text>
         </g>
 
-        <g v-for="lay in edgeLayouts" :key="'dot-' + lay.e.id" class="pointer-events-auto">
-          <circle
-            :cx="lay.mid.x"
-            :cy="lay.mid.y"
-            :r="DOT_HIT_R"
-            fill="transparent"
-            class="cursor-pointer"
-            @click.stop="toggleEdgeLog(lay.e.id)"
+        <g v-for="lay in edgeLayouts" :key="'btn-' + lay.e.id" class="pointer-events-auto">
+          <foreignObject
+            :x="lay.mid.x - BTN_W / 2"
+            :y="lay.mid.y - BTN_H / 2"
+            :width="BTN_W"
+            :height="BTN_H"
           >
-            <title>{{ t('graph.edgeDotHint') }}</title>
-          </circle>
-          <circle
-            :cx="lay.mid.x"
-            :cy="lay.mid.y"
-            :r="DOT_VIS_R"
-            fill="#e8c840"
-            stroke="#5c4f0a"
-            stroke-width="1"
-            class="pointer-events-none"
-          />
-          <circle
-            v-if="linesFor(lay.e.id).length > 0"
-            :cx="lay.mid.x"
-            :cy="lay.mid.y"
-            :r="DOT_VIS_R + 2"
-            fill="none"
-            stroke="#fff6a8"
-            stroke-width="1"
-            stroke-opacity="0.55"
-            class="pointer-events-none"
-          />
+            <div xmlns="http://www.w3.org/1999/xhtml" class="flex h-full w-full items-center justify-center">
+              <button
+                type="button"
+                class="rounded border border-[#1a4d2e] bg-[#2d8f4e] px-1.5 py-0.5 text-[9px] font-bold leading-none text-white shadow hover:bg-[#36a85c] active:bg-[#257a45]"
+                :class="openEdgeLogId === lay.e.id ? 'ring-2 ring-[#9fe6b8]' : ''"
+                :title="t('graph.edgeLogBtnHint')"
+                @click.stop="toggleEdgeLog(lay.e.id)"
+              >
+                {{ t('graph.edgeLogBtn') }}
+              </button>
+            </div>
+          </foreignObject>
         </g>
 
         <g v-if="openEdgeLayout" class="pointer-events-auto">
@@ -418,13 +388,13 @@ onUnmounted(() => {
           >
             <div
               xmlns="http://www.w3.org/1999/xhtml"
-              class="flex h-full flex-col overflow-hidden rounded border border-[#6a6a2a] bg-[#141408]/98 shadow-lg ring-1 ring-[#e8c840]/35"
+              class="flex h-full flex-col overflow-hidden rounded border border-[#2d6a45] bg-[#0d1410]/98 shadow-lg ring-1 ring-[#3d9b5c]/40"
             >
-              <div class="flex shrink-0 items-center justify-between gap-1 border-b border-[#4a4a28] bg-[#1f1c0c] px-1.5 py-1">
-                <span class="text-[9px] font-semibold text-[#f5e6a2]">{{ edgeLabel(openEdgeLayout.e.id) }}</span>
+              <div class="flex shrink-0 items-center justify-between gap-1 border-b border-[#2a4a35] bg-[#122218] px-1.5 py-1">
+                <span class="text-[9px] font-semibold text-[#9fe6b8]">{{ edgeLabel(openEdgeLayout.e.id) }}</span>
                 <button
                   type="button"
-                  class="rounded px-1.5 py-0.5 text-[10px] font-bold leading-none text-[#e8c840] hover:bg-[#3a3518]"
+                  class="rounded px-1.5 py-0.5 text-[11px] font-bold leading-none text-[#7dcea0] hover:bg-[#1a3024]"
                   :aria-label="t('graph.edgeLogClose')"
                   @click.stop="closeEdgeLogPanel"
                 >
@@ -439,7 +409,7 @@ onUnmounted(() => {
                 >
                   {{ ln }}
                 </div>
-                <div v-if="linesFor(openEdgeLayout.e.id).length === 0" class="text-[#777]">
+                <div v-if="linesFor(openEdgeLayout.e.id).length === 0" class="text-[#666]">
                   {{ t('graph.edgeEmpty') }}
                 </div>
               </div>
