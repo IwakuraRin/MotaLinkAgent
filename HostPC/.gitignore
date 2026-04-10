@@ -3,4 +3,5 @@ web/dist/
 server/hostpc
 *.exe
 hostpc-settings.json
-hostpc-settings.json
+hostpc-auth-secret
+hostpc-users.db

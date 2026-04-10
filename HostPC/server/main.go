@@ -7,6 +7,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -154,7 +156,16 @@ func main() {
 	addr := flag.String("addr", "0.0.0.0:8080", "listen address")
 	staticDir := flag.String("static", "../web/dist", "path to Vue build output (pnpm build)")
 	settingsPath := flag.String("settings", "hostpc-settings.json", "JSON file for UI defaults (camera_url); created next to cwd when server runs")
+	mysqlDSN := flag.String("mysql-dsn", "", "MySQL DSN (overrides env MYSQL_DSN); use with production MySQL")
+	sqliteUsers := flag.String("sqlite-users", "", "SQLite file for web users (dev/LAN without MySQL); overrides HOSTPC_SQLITE_USERS env")
+	authSecretPath := flag.String("auth-secret", "hostpc-auth-secret", "file holding 32-byte session signing key (created if missing); override with AUTH_SECRET env")
+	gitRepo := flag.String("git-repo", "", "git repository root for /api/repo/* update checks (default: walk up from cwd for .git)")
 	flag.Parse()
+
+	hostGitRepoRoot = resolveGitRepoRoot(*gitRepo)
+	if hostGitRepoRoot != "" {
+		log.Printf("Git repo for updates: %s", hostGitRepoRoot)
+	}
 
 	st, err := os.Stat(*staticDir)
 	if err != nil || !st.IsDir() {
@@ -164,6 +175,46 @@ func main() {
 	h := &hub{conns: make(map[*websocket.Conn]struct{})}
 	store := &persistedSettings{path: *settingsPath}
 	store.load()
+
+	sqlitePath := strings.TrimSpace(*sqliteUsers)
+	if sqlitePath == "" {
+		sqlitePath = strings.TrimSpace(os.Getenv("HOSTPC_SQLITE_USERS"))
+	}
+	var db *sql.DB
+	usersBackend := "mysql"
+	switch {
+	case sqlitePath != "":
+		db = openSQLiteUsers(sqlitePath)
+		usersBackend = "sqlite"
+	default:
+		db = openMySQLFromEnvOrFlag(*mysqlDSN)
+	}
+	if db == nil {
+		log.Fatal("Set MYSQL_DSN (or -mysql-dsn) for MySQL, or pass -sqlite-users / HOSTPC_SQLITE_USERS for a local SQLite user database.")
+	}
+	defer func() { _ = db.Close() }()
+
+	secret, err := loadOrCreateAuthSecret(*authSecretPath)
+	if err != nil {
+		log.Fatalf("auth secret: %v", err)
+	}
+	authCtx, cancelAuth := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelAuth()
+	if usersBackend == "sqlite" {
+		if err := ensureHostUsersTableSQLite(authCtx, db); err != nil {
+			log.Fatalf("sqlite schema host_users: %v", err)
+		}
+	} else {
+		if err := ensureHostUsersTableMySQL(authCtx, db); err != nil {
+			log.Fatalf("mysql schema host_users: %v", err)
+		}
+	}
+	if err := ensureDefaultWebUser(authCtx, db); err != nil {
+		log.Fatalf("default web user: %v", err)
+	}
+	ar := &authRuntime{db: db, secret: secret}
+
+	mux := http.NewServeMux()
 
 	// Demo + placeholder for ROS/serial: push synthetic lines periodically
 	go func() {
@@ -175,9 +226,14 @@ func main() {
 		}
 	}()
 
-	http.HandleFunc("/ws/shell", handleShellWS)
+	mux.HandleFunc("/api/auth/login", ar.handleLogin)
+	mux.HandleFunc("/api/auth/logout", ar.handleLogout)
+	mux.HandleFunc("/api/auth/me", ar.requireAuth(ar.handleMe))
+	mux.HandleFunc("/api/auth/change-password", ar.requireAuth(ar.handleChangePassword))
 
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/ws/shell", ar.requireAuthWS(handleShellWS))
+
+	mux.HandleFunc("/ws", ar.requireAuthWS(func(w http.ResponseWriter, r *http.Request) {
 		c, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("ws upgrade:", err)
@@ -215,14 +271,20 @@ func main() {
 				})
 			}
 		}
-	})
+	}))
 
-	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"ok":true,"service":"omniroam-host"}`))
+		mh := mysqlHealth(db)
+		mh["users_backend"] = usersBackend
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":      true,
+			"service": "omniroam-host",
+			"mysql":   mh,
+		})
 	})
 
-	http.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/settings", ar.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.Method {
 		case http.MethodGet:
@@ -255,9 +317,14 @@ func main() {
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
-	})
+	}))
 
-	http.HandleFunc("/api/serial/devices", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/fs/list", ar.requireAuth(handleFSList))
+
+	mux.HandleFunc("/api/repo/status", ar.requireAuth(handleRepoStatus))
+	mux.HandleFunc("/api/repo/pull", ar.requireAuth(handleRepoPull))
+
+	mux.HandleFunc("/api/serial/devices", ar.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -268,10 +335,10 @@ func main() {
 			"os":      runtime.GOOS,
 			"devices": devs,
 		})
-	})
+	}))
 
 	fileServer := http.FileServer(http.Dir(*staticDir))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/ws" || r.URL.Path == "/ws/shell" || strings.HasPrefix(r.URL.Path, "/api/") {
 			http.NotFound(w, r)
 			return
@@ -296,7 +363,7 @@ func main() {
 
 	log.Printf("OmniRoam HostPC listening on %s (static=%s)", *addr, *staticDir)
 	logAccessURLs(*addr)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
 // logAccessURLs prints concrete http://IP:port/ hints for 0.0.0.0 / :: binds.

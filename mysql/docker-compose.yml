@@ -1,0 +1,27 @@
+# MySQL for SimpleRoboticArm / HostPC. From this directory:
+#   docker compose up -d
+# Optional: copy .env.example -> .env in this folder to override defaults (compose loads it for ${VAR}).
+#
+# HostPC Go (on the host), e.g.:
+#   export MYSQL_DSN='app:change-me-app@tcp(127.0.0.1:3306)/simple_robotic_arm?parseTime=true'
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: simple-robotic-arm-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-simple_robotic_arm}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-app}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mysql_data:

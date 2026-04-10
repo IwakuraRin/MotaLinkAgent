@@ -11,6 +11,7 @@ import { t } from '../../i18n'
       <li>{{ t('desktop.aboutLi1') }}</li>
       <li>{{ t('desktop.aboutLi2') }}</li>
       <li>{{ t('desktop.aboutLi3') }}</li>
+      <li>{{ t('desktop.aboutLi4') }}</li>
     </ul>
   </div>
 </template>

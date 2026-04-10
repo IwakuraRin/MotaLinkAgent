@@ -1,4 +1,4 @@
-export type DesktopAppKind = 'terminal' | 'logs' | 'about'
+export type DesktopAppKind = 'terminal' | 'logs' | 'files' | 'about'
 
 export interface DesktopWin {
   id: number

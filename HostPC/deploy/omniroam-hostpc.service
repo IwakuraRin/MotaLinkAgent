@@ -1,0 +1,28 @@
+[Unit]
+Description=OmniRoam HostPC (Go HTTP/WebSocket + static Vue UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=omniroam
+Group=omniroam
+WorkingDirectory=/var/lib/omniroam
+
+# SQLite 用户库（默认）。若改用 MySQL：删除下行里的 -sqlite-users …，并取消注释 EnvironmentFile，在 /etc/omniroam/hostpc.env 写 MYSQL_DSN=...
+ExecStart=/usr/sbin/hostpc \
+  -addr 0.0.0.0:8080 \
+  -static /usr/share/omniroam/web/dist \
+  -sqlite-users /var/lib/omniroam/hostpc-users.db \
+  -settings /var/lib/omniroam/hostpc-settings.json \
+  -auth-secret /var/lib/omniroam/hostpc-auth-secret
+
+# EnvironmentFile=-/etc/omniroam/hostpc.env
+
+Restart=on-failure
+RestartSec=3
+# 文件管理器能列出的目录权限 = 此用户；需要更广可读时可改为补组或 ACL
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

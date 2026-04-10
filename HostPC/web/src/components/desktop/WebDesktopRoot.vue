@@ -6,6 +6,7 @@ import DesktopWindow from './DesktopWindow.vue'
 import DeskTerminal from './DeskTerminal.vue'
 import DeskLogs from './DeskLogs.vue'
 import DeskAbout from './DeskAbout.vue'
+import DeskFiles from './DeskFiles.vue'
 
 defineProps<{
   logLines: string[]
@@ -38,6 +39,7 @@ const visibleWindows = computed(() => windows.value.filter((w) => !w.minimized))
 function titleFor(kind: DesktopAppKind): string {
   if (kind === 'terminal') return t('desktop.app.terminal')
   if (kind === 'logs') return t('desktop.app.logs')
+  if (kind === 'files') return t('desktop.app.files')
   return t('desktop.app.about')
 }
 
@@ -80,8 +82,8 @@ function openApp(kind: DesktopAppKind | 'settings') {
 
   zCounter += 1
   const n = windows.value.length
-  const w = kind === 'terminal' ? 560 : kind === 'logs' ? 520 : 440
-  const h = kind === 'terminal' ? 340 : kind === 'logs' ? 360 : 280
+  const w = kind === 'terminal' ? 560 : kind === 'logs' ? 520 : kind === 'files' ? 680 : 440
+  const h = kind === 'terminal' ? 340 : kind === 'logs' ? 360 : kind === 'files' ? 400 : 280
   windows.value.push({
     id: nextId++,
     kind,
@@ -240,6 +242,14 @@ onUnmounted(() => {
         <button
           type="button"
           class="flex w-[76px] flex-col items-center rounded p-2 text-center hover:bg-white/10"
+          @dblclick="openApp('files')"
+        >
+          <span class="text-3xl leading-none" aria-hidden="true">📁</span>
+          <span class="mt-1 text-[11px] leading-tight text-white drop-shadow">{{ t('desktop.app.files') }}</span>
+        </button>
+        <button
+          type="button"
+          class="flex w-[76px] flex-col items-center rounded p-2 text-center hover:bg-white/10"
           @dblclick="openApp('about')"
         >
           <span class="text-3xl leading-none" aria-hidden="true">ℹ</span>
@@ -271,6 +281,7 @@ onUnmounted(() => {
       >
         <DeskTerminal v-if="w.kind === 'terminal'" />
         <DeskLogs v-else-if="w.kind === 'logs'" :lines="logLines" />
+        <DeskFiles v-else-if="w.kind === 'files'" />
         <DeskAbout v-else />
       </DesktopWindow>
 
@@ -296,6 +307,13 @@ onUnmounted(() => {
           @click="openApp('logs')"
         >
           {{ t('desktop.app.logs') }}
+        </button>
+        <button
+          type="button"
+          class="block w-full px-3 py-2 text-left text-xs text-[#d0dce8] hover:bg-white/10"
+          @click="openApp('files')"
+        >
+          {{ t('desktop.app.files') }}
         </button>
         <button
           type="button"
