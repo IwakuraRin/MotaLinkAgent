@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// 展示代码结构：
+//   · v-model：摄像头 URL、串口角色、日志条数、键盘开关
+//   · 表单区块：语言、视频、串口、连接、控制、显示、ROS 说明
+//
 import { t, setLocale, type Locale } from '../i18n'
 
 const SERIAL_ROLE_KEYS = ['esp32_uart', 'aux_serial'] as const

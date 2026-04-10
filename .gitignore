@@ -65,3 +65,6 @@ catkin_ws/logs/
 
 # PlatformIO（simplerobotic/ 内另有 .gitignore）
 simplerobotic/.pio/
+
+# OmniRoam 根目录 start/restart 脚本写入的 PID 与日志
+.omniroam/

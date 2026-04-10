@@ -1,3 +1,8 @@
+// 展示代码结构：
+//   · 会话密钥 loadOrCreateAuthSecret（文件或 AUTH_SECRET）
+//   · MySQL 表 ensureHostUsersTableMySQL、默认账号 ensureDefaultWebUser（SQLite 见 sqlite_users.go）
+//   · authRuntime：Cookie/JWT、requireAuth / requireAuthWS、登录登出改密等 HTTP 处理器
+//
 package main
 
 import (
@@ -19,6 +24,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+//--------//
+// 模块：常量与类型 — 会话 Cookie 名、时长、JWT Claims、authRuntime
 const (
 	sessionCookieName = "HostSession"
 	sessionDuration   = 7 * 24 * time.Hour
@@ -68,6 +75,8 @@ func loadOrCreateAuthSecret(path string) ([]byte, error) {
 	return sum[:], nil
 }
 
+//--------//
+// 模块：数据库 schema — host_users（MySQL）
 func ensureHostUsersTableMySQL(ctx context.Context, db *sql.DB) error {
 	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS host_users (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -81,6 +90,8 @@ func ensureHostUsersTableMySQL(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+//--------//
+// 模块：首次部署 — 无用户时插入默认 web 账号
 func ensureDefaultWebUser(ctx context.Context, db *sql.DB) error {
 	var n int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM host_users`).Scan(&n); err != nil {
@@ -103,6 +114,8 @@ func ensureDefaultWebUser(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+//--------//
+// 模块：会话 Cookie — Secure 判定、写入/清除
 func (ar *authRuntime) cookieSecure(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
@@ -134,6 +147,8 @@ func (ar *authRuntime) clearSessionCookie(w http.ResponseWriter, r *http.Request
 	})
 }
 
+//--------//
+// 模块：JWT — 签发与从 Cookie 解析
 func (ar *authRuntime) signToken(uid uint64) (string, error) {
 	now := time.Now()
 	claims := sessionClaims{
@@ -168,6 +183,8 @@ func (ar *authRuntime) parseSession(r *http.Request) (uint64, error) {
 	return claims.UID, nil
 }
 
+//--------//
+// 模块：中间件 — HTTP / WebSocket 鉴权包装
 func (ar *authRuntime) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, err := ar.parseSession(r)
@@ -203,6 +220,8 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+//--------//
+// 模块：HTTP 处理器 — /api/auth/*（登录、登出、me、改密）
 func (ar *authRuntime) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)

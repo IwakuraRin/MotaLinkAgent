@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// 展示代码结构：
+//   · 可拖拽/最大化日志浮窗 · 自动滚底 · props.lines 同步
+//
 import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { t } from '../i18n'
 

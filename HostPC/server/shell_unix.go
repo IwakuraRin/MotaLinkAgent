@@ -1,5 +1,9 @@
 //go:build !windows
 
+// 展示代码结构：
+//   · tryStartShellPTY：启动交互 shell（多 argv 回退）
+//   · handleShellWS：/ws/shell WebSocket 与 PTY 双向转发
+//
 package main
 
 import (
@@ -16,6 +20,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+//--------//
+// 模块：PTY 子进程 — 启动 bash/login shell
 // tryStartShellPTY starts an interactive shell under a PTY. Ubuntu's /bin/sh (dash) does not
 // support -l, so we fall back through several argv patterns.
 func tryStartShellPTY() (*os.File, *exec.Cmd, error) {
@@ -78,6 +84,8 @@ func tryStartShellPTY() (*os.File, *exec.Cmd, error) {
 	return nil, nil, fmt.Errorf("pty shell: %w", lastErr)
 }
 
+//--------//
+// 模块：WebSocket /ws/shell — PTY 与浏览器双向 IO
 func handleShellWS(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

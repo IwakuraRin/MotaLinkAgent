@@ -1,3 +1,7 @@
+// 展示代码结构：
+//   · updateConfig：GitHub CHANGELOG URL、本地仓库 git 对比、构建状态载荷
+//   · handleStatus / handleApply：HTTP API；apply 互斥锁 + 调用自更新 shell
+//
 package main
 
 import (
@@ -15,6 +19,8 @@ import (
 	"time"
 )
 
+//--------//
+// 模块：配置与辅助 — GitHub slug 解析、拉取 CHANGELOG、git 命令输出
 const maxChangelogBytes = 16000
 
 type updateConfig struct {
@@ -93,6 +99,8 @@ func runGitOutput(ctx context.Context, dir string, args ...string) (string, erro
 	return s, nil
 }
 
+//--------//
+// 模块：更新状态 — 本地/远端 SHA、changelog、错误原因
 type updateStatusPayload struct {
 	Enabled         bool   `json:"enabled"`
 	UpdateAvailable bool   `json:"update_available"`
@@ -175,6 +183,8 @@ func (c *updateConfig) buildStatus(ctx context.Context) updateStatusPayload {
 	return out
 }
 
+//--------//
+// 模块：HTTP — GET /api/updates/status
 func (c *updateConfig) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -187,6 +197,8 @@ func (c *updateConfig) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 var deployMu sync.Mutex
 
+//--------//
+// 模块：HTTP — POST /api/updates/apply（执行自更新脚本）
 func (c *updateConfig) handleApply(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -235,11 +247,23 @@ func (c *updateConfig) handleApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if c.h != nil {
-		c.h.sendLogEdge("INFO  HostPC self-update started (git pull + build + install)", "e_http_api")
+		c.h.sendLogEdge("INFO  OmniRoam update.sh started (download → sync → build → restart)", "e_http_api")
 	}
 
 	cmd := exec.CommandContext(ctx, "bash", script, repo)
 	cmd.Dir = filepath.Dir(script)
+	slug := strings.TrimSpace(c.GithubSlug)
+	branch := strings.TrimSpace(c.Branch)
+	if branch == "" {
+		branch = "main"
+	}
+	cmd.Env = append(os.Environ(),
+		"OMNIROAM_REPO_ROOT="+repo,
+		"OMNIROAM_GITHUB_BRANCH="+branch,
+	)
+	if slug != "" {
+		cmd.Env = append(cmd.Env, "OMNIROAM_GITHUB_SLUG="+slug)
+	}
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
 	exit := 0

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// 展示代码结构：
+//   · 节点/边常量 EDGES · SVG 自动布局 · 边选中与日志面板 · 响应缩放
+//
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { t } from '../i18n'
 import type { TopologyEdgeId } from '../topology'
@@ -30,6 +33,8 @@ const EDGES: EdgeDef[] = [
   { id: 'e_video_ui', from: 'browser', to: 'stream' },
 ]
 
+//--------//
+// 模块：布局 — 计算各节点坐标（浏览器/HostPC/ROS/外设）
 /** 分层自动布局：上层 = 浏览器 / 上位机 / ROS；中层 = 流与配置；底层 = 摄像头 / 视觉 / ESP32 */
 function computeAutoLayout(): NodeDef[] {
   const topY = 28

@@ -1,3 +1,9 @@
+// 展示代码结构：
+//   · WebSocket Hub：连接管理、JSON 广播、按拓扑边 sendLogEdge 下发日志
+//   · persistedSettings：camera_url / serial_roles 读写 hostpc-settings.json
+//   · main：命令行参数、MySQL 或 SQLite 用户库、JWT 会话、HTTP+WS 路由、静态前端、Listen
+//   · logAccessURLs：0.0.0.0 监听时打印局域网 http://IP:port/
+//
 // OmniRoam HostPC — HTTP static + WebSocket log/control hub for LAN access.
 // Run from repo: go run . -addr 0.0.0.0:8080 -static ../web/dist
 // (Build web first: cd ../web && pnpm install && pnpm build)
@@ -26,6 +32,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+//--------//
+// 模块：WebSocket — Upgrader 与 Hub（连接增删、广播、日志带 edge 路由）
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -74,6 +82,8 @@ func (h *hub) sendLogEdge(line, edge string) {
 	h.broadcastJSON(payload)
 }
 
+//--------//
+// 模块：持久化设置 — 与前端 /api/settings 同步；ROS/脚本可读 hostpc-settings.json
 // persistedSettings is a JSON file so LAN clients share camera URL and serial role → device path bindings.
 // ROS / scripts can read the same file (e.g. jq .serial_roles.esp32_uart hostpc-settings.json).
 type persistedSettings struct {
@@ -152,6 +162,8 @@ func (s *persistedSettings) saveAll(cameraURL string, roles map[string]string) e
 	return os.WriteFile(s.path, out, 0o600)
 }
 
+//--------//
+// 模块：程序入口 — 静态目录检查、数据库、鉴权、路由、演示日志 ticker、启动 HTTP 服务
 func main() {
 	addr := flag.String("addr", "0.0.0.0:8080", "listen address")
 	staticDir := flag.String("static", "../web/dist", "path to Vue build output (pnpm build)")
@@ -215,6 +227,8 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	//--------//
+	// 模块：演示日志 — 定时向拓扑边推送占位行（可替换为 rostopic/串口）
 	// Demo + placeholder for ROS/serial: push synthetic lines periodically
 	go func() {
 		t := time.NewTicker(4 * time.Second)
@@ -225,6 +239,8 @@ func main() {
 		}
 	}()
 
+	//--------//
+	// 模块：HTTP 路由 — 登录/登出/会话/改密
 	mux.HandleFunc("/api/auth/login", ar.handleLogin)
 	mux.HandleFunc("/api/auth/logout", ar.handleLogout)
 	mux.HandleFunc("/api/auth/me", ar.requireAuth(ar.handleMe))
@@ -232,6 +248,8 @@ func main() {
 
 	mux.HandleFunc("/ws/shell", ar.requireAuthWS(handleShellWS))
 
+	//--------//
+	// 模块：WebSocket 路由 — 主通道：日志订阅 + 键盘遥控 JSON
 	mux.HandleFunc("/ws", ar.requireAuthWS(func(w http.ResponseWriter, r *http.Request) {
 		c, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -272,6 +290,8 @@ func main() {
 		}
 	}))
 
+	//--------//
+	// 模块：HTTP 路由 — 健康检查、设置读写、本机目录列表
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		mh := mysqlHealth(db)
@@ -320,6 +340,8 @@ func main() {
 
 	mux.HandleFunc("/api/fs/list", ar.requireAuth(handleFSList))
 
+	//--------//
+	// 模块：HTTP 路由 — 远端更新状态与一键部署（git + 脚本）
 	branch := strings.TrimSpace(*ghBranch)
 	if branch == "" {
 		branch = "main"
@@ -331,7 +353,12 @@ func main() {
 	updateScriptPath := strings.TrimSpace(*updateScriptFlag)
 	repoRootTrim := strings.TrimSpace(*repoRoot)
 	if updateScriptPath == "" && repoRootTrim != "" {
-		updateScriptPath = filepath.Join(repoRootTrim, "HostPC", "deploy", "hostpc-self-update.sh")
+		rootUpdate := filepath.Join(repoRootTrim, "update.sh")
+		if st, err := os.Stat(rootUpdate); err == nil && !st.IsDir() {
+			updateScriptPath = rootUpdate
+		} else {
+			updateScriptPath = filepath.Join(repoRootTrim, "HostPC", "deploy", "hostpc-self-update.sh")
+		}
 	}
 	uc := &updateConfig{
 		h:             h,
@@ -344,6 +371,8 @@ func main() {
 	mux.HandleFunc("/api/updates/status", ar.requireAuth(uc.handleStatus))
 	mux.HandleFunc("/api/updates/apply", ar.requireAuth(uc.handleApply))
 
+	//--------//
+	// 模块：HTTP 路由 — 枚举本机 USB 串口（Linux）
 	mux.HandleFunc("/api/serial/devices", ar.requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -357,6 +386,8 @@ func main() {
 		})
 	}))
 
+	//--------//
+	// 模块：静态资源 — Vue 构建产物 + SPA fallback index.html
 	fileServer := http.FileServer(http.Dir(*staticDir))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/ws" || r.URL.Path == "/ws/shell" || strings.HasPrefix(r.URL.Path, "/api/") {
@@ -386,6 +417,8 @@ func main() {
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
+//--------//
+// 模块：运维提示 — 解析 -addr 并在绑定 0.0.0.0 时枚举本机 IPv4 访问 URL
 // logAccessURLs prints concrete http://IP:port/ hints for 0.0.0.0 / :: binds.
 func logAccessURLs(listenAddr string) {
 	host, port, err := net.SplitHostPort(listenAddr)

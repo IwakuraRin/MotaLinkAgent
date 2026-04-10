@@ -1,4 +1,12 @@
 <script setup lang="ts">
+// 展示代码结构：
+//   · 鉴权：登录/登出/改密、会话 apiFetch
+//   · 自更新：轮询 /api/updates/status、弹窗与倒计时部署
+//   · 主 Tab：控制台（视频+拓扑+键盘）/ 桌面 WebDesktopRoot
+//   · WebSocket：日志、按键遥控、边沿日志 ingestLog
+//   · 设置抽屉：语言、摄像头 URL、串口绑定、日志条数等
+//   · 模板：Teleport 设置/改密/更新弹窗、FloatingLogWindow
+//
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { t, locale, setLocale, type Locale } from './i18n'
 import { emptyEdgeLogMap, isTopologyEdgeId, type TopologyEdgeId } from './topology'
@@ -17,6 +25,8 @@ function apiFetch(input: string, init?: RequestInit) {
   return fetch(input, { ...init, credentials: 'include' })
 }
 
+//--------//
+// 模块：鉴权状态 — 登录表单、会话检查、改密弹窗
 const sessionReady = ref(false)
 const loggedIn = ref(false)
 const authUsername = ref('')
@@ -56,6 +66,8 @@ const updateDeployBusy = ref(false)
 let updatePollHandle: ReturnType<typeof setInterval> | null = null
 let updateCountdownHandle: ReturnType<typeof setInterval> | null = null
 
+//--------//
+// 模块：HostPC 自更新 — 状态轮询、弹窗流程、调用 /api/updates/apply
 function shortGitSha(s: string | undefined) {
   if (!s) return '—'
   return s.length > 7 ? s.slice(0, 7) : s
@@ -208,6 +220,8 @@ watch(mainTab, (v) => {
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('omniroam.main_tab', v)
 })
 
+//--------//
+// 模块：控制台 — 串口列表、日志缓冲、摄像头 URL、拓扑边日志
 type SerialDev = { path: string; target: string; kind: string }
 
 const SERIAL_ROLE_KEYS = ['esp32_uart', 'aux_serial'] as const
@@ -277,6 +291,8 @@ let ws: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let wsAllowReconnect = true
 
+//--------//
+// 模块：日志行 — 主控制台缓冲 + 按拓扑边分栏
 function pushLine(line: string): string {
   const tim = new Date().toISOString().replace('T', ' ').slice(0, 23)
   const row = `[${tim}] ${line}`
@@ -336,6 +352,8 @@ function onKeyEv(e: KeyboardEvent, down: boolean) {
 const onWindowKeyDown = (e: KeyboardEvent) => onKeyEv(e, true)
 const onWindowKeyUp = (e: KeyboardEvent) => onKeyEv(e, false)
 
+//--------//
+// 模块：WebSocket — 连接、重连、消息解析为日志
 function connectWs() {
   wsAllowReconnect = true
   wsState.value = 'connecting'
@@ -396,6 +414,8 @@ function reconnectWebSocket() {
   setTimeout(() => connectWs(), 50)
 }
 
+//--------//
+// 模块：鉴权 API — checkSession、登录登出改密、登录后引导
 async function checkSession() {
   try {
     const r = await apiFetch('/api/auth/me')
@@ -538,6 +558,8 @@ function onPwdBackdrop() {
   if (pwdModal.value === 'nudge') dismissPwdNudge()
 }
 
+//--------//
+// 模块：改密弹窗 — 打开/关闭表单
 function openPwdFormFromNudge() {
   pwdFormError.value = ''
   pwdCurrent.value = ''
@@ -554,6 +576,8 @@ function openPwdFormVoluntary() {
   pwdModal.value = 'form'
 }
 
+//--------//
+// 模块：摄像头 — 绑定 video 元素、从设置/API hydrate URL
 function bindCamera() {
   if (!camRef.value) return
   const src = cameraSrc.value
@@ -592,6 +616,8 @@ async function hydrateAppliedCameraUrl() {
   }
 }
 
+//--------//
+// 模块：串口与设置面板 — 枚举设备、加载 serial_roles、保存 settings
 async function refreshSerialDevices() {
   serialListLoading.value = true
   try {
@@ -701,6 +727,8 @@ watch(keyboardEnabled, (v) => {
   localStorage.setItem(LS_KEYBOARD, v ? '1' : '0')
 })
 
+//--------//
+// 模块：生命周期 — 挂载时恢复本地选项、键盘监听、会话与 WS
 onMounted(async () => {
   const ml = localStorage.getItem(LS_MAXLOG)
   if (ml) {
@@ -734,6 +762,8 @@ onUnmounted(() => {
   }
 })
 
+//--------//
+// 模块：UI 派生 — WebSocket 状态颜色
 const statusColor = computed(() => {
   switch (wsState.value) {
     case 'open':
@@ -749,16 +779,19 @@ const statusColor = computed(() => {
 </script>
 
 <template>
+  <!-- -------- 根布局：会话门控 → 登录页 或 主界面 -------- -->
   <div
     class="relative flex h-full min-h-[600px] flex-col bg-pve-bg font-ui text-pve-text"
     tabindex="0"
   >
+    <!-- -------- 模块：会话检查中 -------- -->
     <div
       v-if="!sessionReady"
       class="flex flex-1 items-center justify-center font-mono text-sm text-pve-muted"
     >
       {{ t('auth.checking') }}
     </div>
+    <!-- -------- 模块：未登录 — 登录表单 -------- -->
     <div
       v-else-if="!loggedIn"
       class="flex flex-1 flex-col items-center justify-center gap-6 p-6"
@@ -795,6 +828,7 @@ const statusColor = computed(() => {
       </div>
     </div>
     <template v-else>
+    <!-- -------- 模块：顶栏 — 标题、WS 状态、设置/改密/登出 -------- -->
     <header
       class="flex h-9 shrink-0 items-center border-b border-pve-border bg-gradient-to-b from-[#454545] to-[#3a3a3a] px-3 text-sm shadow"
     >
@@ -830,6 +864,7 @@ const statusColor = computed(() => {
       </div>
     </header>
 
+    <!-- -------- 模块：改密提醒条 -------- -->
     <div
       v-if="mustChangePassword && pwdNudgeDismissed"
       class="flex shrink-0 items-center justify-between gap-2 border-b border-amber-600/40 bg-amber-900/25 px-3 py-1.5 text-xs text-amber-200"
@@ -850,6 +885,7 @@ const statusColor = computed(() => {
       </button>
     </div>
 
+    <!-- -------- 模块：主 Tab — 控制台 / 桌面 -------- -->
     <nav
       class="flex h-9 shrink-0 items-stretch gap-0 border-b border-pve-border bg-[#2e2e2e] px-1"
       aria-label="Main"
@@ -880,6 +916,7 @@ const statusColor = computed(() => {
       </button>
     </nav>
 
+    <!-- -------- 模块：设置侧栏（语言/视频/串口/连接/控制/显示） -------- -->
     <Teleport to="body">
       <div
         v-show="settingsOpen"
@@ -1040,8 +1077,10 @@ const statusColor = computed(() => {
       </div>
     </Teleport>
 
+    <!-- -------- 模块：主内容区 -------- -->
     <div class="flex min-h-0 flex-1 flex-col">
       <template v-if="mainTab === 'console'">
+        <!-- -------- 子模块：控制台 — 视频 + 拓扑图 -------- -->
         <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
           <section
             class="flex min-h-[240px] w-full shrink-0 flex-col border-b border-pve-border lg:min-h-0 lg:w-[42%] lg:border-b-0 lg:border-r"
@@ -1076,6 +1115,7 @@ const statusColor = computed(() => {
           <HostTopologyGraph :edge-logs="edgeLogs" />
         </div>
 
+        <!-- -------- 子模块：底盘操作说明（WASD/QE） -------- -->
         <footer
           class="shrink-0 border-t border-pve-border bg-pve-panel px-4 py-3 shadow-[inset_0_1px_0_#4a4a4a]"
         >
@@ -1114,12 +1154,15 @@ const statusColor = computed(() => {
         </footer>
       </template>
 
+      <!-- -------- 子模块：仿桌面（终端/文件等） -------- -->
       <WebDesktopRoot v-else :log-lines="consoleLines" @open-settings="settingsOpen = true" />
     </div>
 
+    <!-- -------- 模块：可拖拽悬浮日志窗口 -------- -->
     <FloatingLogWindow :lines="consoleLines" />
     </template>
 
+    <!-- -------- 模块：改密对话框 -------- -->
     <Teleport to="body">
       <div
         v-if="loggedIn && pwdModal !== 'off'"
@@ -1202,6 +1245,7 @@ const statusColor = computed(() => {
       </div>
     </Teleport>
 
+    <!-- -------- 模块：自更新提示与部署输出 -------- -->
     <Teleport to="body">
       <div
         v-if="loggedIn && updateModal !== 'off'"

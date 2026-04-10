@@ -1,3 +1,6 @@
+// 展示代码结构：
+//   · GET /api/fs/list：Linux 下列出绝对路径目录（需登录）；条目含大小、时间、权限位
+//
 package main
 
 import (
@@ -21,6 +24,8 @@ type fsListEntry struct {
 	Mode    uint32 `json:"mode"`     // unix permission bits (ls -l style)
 }
 
+//--------//
+// 模块：目录列表 API — 校验绝对路径、读目录、排序 JSON 输出
 // handleFSList serves GET /api/fs/list?path=/absolute/dir — Linux host only; requires auth.
 func handleFSList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

@@ -1,3 +1,7 @@
+// 展示代码结构：
+//   · 解析本机 Git 仓库根、origin URL、分支与 fetch/pull
+//   · handleRepoStatus / handleRepoPull：供其它流程查询或拉取（与 updates.go 自更新可并存）
+//
 package main
 
 import (
@@ -15,6 +19,8 @@ import (
 // Set from main() after flag parsing; empty disables /api/repo/*.
 var hostGitRepoRoot string
 
+//--------//
+// 模块：仓库根解析 — 从参数或当前目录向上查找 .git
 func resolveGitRepoRoot(explicit string) string {
 	explicit = strings.TrimSpace(explicit)
 	if explicit != "" {
@@ -61,6 +67,8 @@ func gitTrim(s string) string {
 	return strings.TrimSpace(strings.TrimSuffix(s, "\n"))
 }
 
+//--------//
+// 模块：git 封装 — 单行输出、remote URL、当前分支
 func gitLine(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
@@ -87,6 +95,8 @@ func currentBranch(ctx context.Context, dir string) string {
 	return b
 }
 
+//--------//
+// 模块：HTTP — 仓库状态（ahead/behind、SHA）
 func handleRepoStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodGet {
@@ -161,6 +171,8 @@ func handleRepoStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+//--------//
+// 模块：HTTP — git pull origin <branch>
 func handleRepoPull(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {

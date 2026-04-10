@@ -1,5 +1,8 @@
 //go:build linux
 
+// 展示代码结构：
+//   · listSerialDevicesForAPI：扫描 /dev/serial/by-id、ttyUSB、ttyACM 等并去重
+//
 package main
 
 import (
@@ -14,6 +17,8 @@ type serialDeviceEntry struct {
 	Kind   string `json:"kind"`
 }
 
+//--------//
+// 模块：串口枚举 — 供 /api/serial/devices
 // listSerialDevicesForAPI enumerates TTY-style USB serial nodes. Prefer /dev/serial/by-id/*
 // so the same physical cable keeps one path across ttyUSB0 vs ttyACM0 re-enumeration.
 func listSerialDevicesForAPI() []serialDeviceEntry {

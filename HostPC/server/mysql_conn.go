@@ -1,3 +1,7 @@
+// 展示代码结构：
+//   · openMySQLFromEnvOrFlag：生产 MySQL 连接池
+//   · mysqlHealth：/api/health 中返回连接状态摘要
+//
 package main
 
 import (
@@ -11,6 +15,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+//--------//
+// 模块：MySQL 连接
 // openMySQLFromEnvOrFlag returns a pooled *sql.DB when -mysql-dsn or MYSQL_DSN is set.
 // Empty DSN means MySQL is disabled (embedded static UI still works).
 func openMySQLFromEnvOrFlag(flagDSN string) *sql.DB {
@@ -37,6 +43,8 @@ func openMySQLFromEnvOrFlag(flagDSN string) *sql.DB {
 	return db
 }
 
+//--------//
+// 模块：健康检查 — Ping MySQL
 func mysqlHealth(db *sql.DB) map[string]any {
 	if db == nil {
 		return map[string]any{"enabled": false}

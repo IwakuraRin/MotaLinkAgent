@@ -1,11 +1,19 @@
+// 展示代码结构：
+//   · locale ref + localStorage 持久化
+//   · 多语言文案表 M（en/zh/ko）· t() 翻译函数 · initLocale / setLocale
+//
 import { ref } from 'vue'
 
+//--------//
+// 模块：语言类型与当前 locale
 export type Locale = 'en' | 'zh' | 'ko'
 
 const LS = 'omniroam.locale'
 
 export const locale = ref<Locale>('en')
 
+//--------//
+// 模块：文案表 — 各语言 key → 字符串
 const M: Record<Locale, Record<string, string>> = {
   en: {
     'app.subtitle': 'Host Console',
@@ -552,6 +560,8 @@ const M: Record<Locale, Record<string, string>> = {
   },
 }
 
+//--------//
+// 模块：locale 读写 — localStorage、document.lang、t() 查表
 export function initLocale(): void {
   const s = localStorage.getItem(LS)
   if (s === 'zh' || s === 'ko' || s === 'en') {

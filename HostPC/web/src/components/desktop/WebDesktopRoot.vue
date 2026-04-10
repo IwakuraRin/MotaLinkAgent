@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// 展示代码结构：
+//   · 多窗口栈 z-index、开始菜单、任务栏
+//   · 内嵌子应用：终端 / 日志 / 文件 / 关于（各 Desk*.vue）
+//
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { t } from '../../i18n'
 import type { DesktopWin, DesktopAppKind } from '../../desktop/types'
