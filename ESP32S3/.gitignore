@@ -1,5 +1,2 @@
-# PlatformIO：依赖与固件产物，本地 `pio run` 会重新生成
-.pio/
-
 # 编辑器配置（非固件源码）
 .vscode/
