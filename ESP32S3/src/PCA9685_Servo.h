@@ -29,7 +29,7 @@ public:
     
     bool setAngle(uint8_t channel, uint16_t angle, bool debug = false);
     bool setPulse(uint8_t channel, uint16_t onTime, uint16_t offTime);
-    void setAngles(uint8_t channels[], uint16_t angles[], uint8_t count, bool debug = false);
+    void setAngles(const uint8_t channels[], const uint16_t angles[], uint8_t count, bool debug = false);
     void setFrequency(uint8_t freq);
     bool isInitialized() { return _initialized; }
     uint8_t getI2CAddress() { return _i2cAddress; }

@@ -13,6 +13,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  sensor_msgs
+  geometry_msgs
+  cv_bridge
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,7 +110,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES simple_robotic_arm
-  CATKIN_DEPENDS roscpp rospy std_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs geometry_msgs cv_bridge
 #  DEPENDS system_lib
 )
 
@@ -165,6 +168,7 @@ catkin_install_python(PROGRAMS
   scripts/esp32_serial_bridge.py
   scripts/arm_kinematics.py
   scripts/chassis_kinematics.py
+  scripts/line_follow_vision.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

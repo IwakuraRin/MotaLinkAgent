@@ -66,6 +66,10 @@
   <!-- 串口桥接节点 esp32_serial_bridge.py -->
   <exec_depend>python3-serial</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <!-- line_follow_vision.py：OpenCV 巡线 + cv_bridge -->
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

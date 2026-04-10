@@ -2,3 +2,5 @@ web/node_modules/
 web/dist/
 server/hostpc
 *.exe
+hostpc-settings.json
+hostpc-settings.json

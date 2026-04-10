@@ -72,7 +72,7 @@ bool PCA9685_Servo::setPulse(uint8_t channel, uint16_t onTime, uint16_t offTime)
     return true;
 }
 
-void PCA9685_Servo::setAngles(uint8_t channels[], uint16_t angles[], 
+void PCA9685_Servo::setAngles(const uint8_t channels[], const uint16_t angles[],
                              uint8_t count, bool debug) {
     for (uint8_t i = 0; i < count; i++) {
         setAngle(channels[i], angles[i], debug);
@@ -176,8 +176,7 @@ void PCA9685_Servo::turnOffAll(uint8_t startChannel, uint8_t endChannel) {
 // 注意：scanI2C 是静态函数，不依赖于 PCA9685 对象
 void PCA9685_Servo::scanI2C(TwoWire &wire) {
     Serial.println("[PCA9685] 开始扫描I2C总线...");
-    
-    wire.begin();
+
     for (byte address = 1; address < 127; address++) {
         wire.beginTransmission(address);
         byte error = wire.endTransmission();
