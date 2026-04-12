@@ -1,6 +1,6 @@
 // 展示代码结构：
 //   · WebSocket Hub：连接管理、JSON 广播、按拓扑边 sendLogEdge 下发日志
-//   · persistedSettings：camera_url / serial_roles 读写 hostpc-settings.json
+//   · persistedSettings：camera_url / serial_roles 读写 hostpc-settings.json；/ws/vnc 转发本机 VNC
 //   · main：命令行参数、MySQL 或 SQLite 用户库、JWT 会话、HTTP+WS 路由、静态前端、Listen
 //   · logAccessURLs：0.0.0.0 监听时打印局域网 http://IP:port/
 //
@@ -84,7 +84,7 @@ func (h *hub) sendLogEdge(line, edge string) {
 
 //--------//
 // 模块：持久化设置 — 与前端 /api/settings 同步；ROS/脚本可读 hostpc-settings.json
-// persistedSettings is a JSON file so LAN clients share camera URL and serial role → device path bindings.
+// persistedSettings is a JSON file so LAN clients share camera URL and serial role → device path bindings. Remote desktop uses /ws/vnc → local TCP VNC.
 // ROS / scripts can read the same file (e.g. jq .serial_roles.esp32_uart hostpc-settings.json).
 type persistedSettings struct {
 	mu          sync.Mutex
@@ -176,7 +176,14 @@ func main() {
 	ghBranch := flag.String("github-branch", strings.TrimSpace(os.Getenv("HOSTPC_GITHUB_BRANCH")), "remote branch to track (default main)")
 	changelogPath := flag.String("changelog", strings.TrimSpace(os.Getenv("HOSTPC_CHANGELOG_PATH")), "changelog file path in GitHub repo (default CHANGELOG.md)")
 	updateScriptFlag := flag.String("update-script", strings.TrimSpace(os.Getenv("HOSTPC_UPDATE_SCRIPT")), "self-update bash script (default: <repo-root>/HostPC/deploy/hostpc-self-update.sh)")
+	vncAddrFlag := flag.String("vnc-addr", strings.TrimSpace(os.Getenv("HOSTPC_VNC_ADDR")), "TCP address of local VNC (RFB) for authenticated /ws/vnc WebSocket proxy; empty → 127.0.0.1:5900")
 	flag.Parse()
+
+	vncTarget := strings.TrimSpace(*vncAddrFlag)
+	if vncTarget == "" {
+		vncTarget = "127.0.0.1:5900"
+	}
+	log.Printf("VNC WebSocket proxy: /ws/vnc → tcp/%s (override with -vnc-addr or HOSTPC_VNC_ADDR)", vncTarget)
 
 	st, err := os.Stat(*staticDir)
 	if err != nil || !st.IsDir() {
@@ -246,6 +253,7 @@ func main() {
 	mux.HandleFunc("/api/auth/me", ar.requireAuth(ar.handleMe))
 	mux.HandleFunc("/api/auth/change-password", ar.requireAuth(ar.handleChangePassword))
 
+	mux.HandleFunc("/ws/vnc", ar.requireAuthWS(handleVNCProxyWS(vncTarget)))
 	mux.HandleFunc("/ws/shell", ar.requireAuthWS(handleShellWS))
 
 	//--------//

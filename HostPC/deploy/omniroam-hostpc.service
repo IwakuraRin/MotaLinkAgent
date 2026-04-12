@@ -10,6 +10,7 @@ Group=omniroam
 WorkingDirectory=/var/lib/omniroam
 
 # SQLite 用户库（默认）。若改用 MySQL：删除下行里的 -sqlite-users …，并取消注释 EnvironmentFile，在 /etc/omniroam/hostpc.env 写 MYSQL_DSN=...
+# 远程桌面 noVNC：默认把 /ws/vnc 转到本机 127.0.0.1:5900；若 VNC 在别的端口可设 Environment=HOSTPC_VNC_ADDR=127.0.0.1:5901
 ExecStart=/usr/sbin/hostpc \
   -addr 0.0.0.0:8080 \
   -static /usr/share/omniroam/web/dist \

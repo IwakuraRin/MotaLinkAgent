@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SystemInfo
+Name[zh_CN]=系统信息
+Comment=OmniRoam system overview and resource usage
+Comment[zh_CN]=OmniRoam 系统概览与资源占用
+Exec=systeminfo
+Icon=systeminfo
+Terminal=false
+Categories=System;Monitor;GTK;
+Keywords=system;info;cpu;memory;disk;OmniRoam;OmniOS;
+StartupNotify=true
+StartupWMClass=systeminfo

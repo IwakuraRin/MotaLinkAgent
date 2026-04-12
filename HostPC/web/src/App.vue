@@ -2,7 +2,7 @@
 // 展示代码结构：
 //   · 鉴权：登录/登出/改密、会话 apiFetch
 //   · 自更新：轮询 /api/updates/status、弹窗与倒计时部署
-//   · 主 Tab：控制台（视频+拓扑+键盘）/ 桌面 WebDesktopRoot
+//   · 主 Tab：控制台（视频+拓扑+键盘）/ 远程桌面 RemoteDesktopTab（noVNC + 侧栏终端）
 //   · WebSocket：日志、按键遥控、边沿日志 ingestLog
 //   · 设置抽屉：语言、摄像头 URL、串口绑定、日志条数等
 //   · 模板：Teleport 设置/改密/更新弹窗、FloatingLogWindow
@@ -12,9 +12,10 @@ import { t, locale, setLocale, type Locale } from './i18n'
 import { emptyEdgeLogMap, isTopologyEdgeId, type TopologyEdgeId } from './topology'
 import FloatingLogWindow from './components/FloatingLogWindow.vue'
 import HostTopologyGraph from './components/HostTopologyGraph.vue'
-import WebDesktopRoot from './components/desktop/WebDesktopRoot.vue'
+import RemoteDesktopTab from './components/desktop/RemoteDesktopTab.vue'
 
 const LS_CAMERA = 'omniroam.camera_url'
+const LS_NOVNC_PWD = 'omniroam.novnc_password'
 const LS_MAXLOG = 'omniroam.console_max_lines'
 const LS_KEYBOARD = 'omniroam.keyboard_enabled'
 const LS_PWD_DISMISS = 'omniroam.pwd_dismiss'
@@ -237,6 +238,8 @@ const lastCmd = ref('')
 const settingsOpen = ref(false)
 const settingsCameraDraft = ref('')
 const appliedCameraUrl = ref('')
+const settingsNovncPwdDraft = ref('')
+const appliedNovncPwd = ref('')
 const maxLogLines = ref(500)
 const keyboardEnabled = ref(true)
 
@@ -249,7 +252,6 @@ const serialRolesDraft = ref<Record<SerialRoleKey, string>>({
 })
 
 const envCamera = (import.meta.env.VITE_CAMERA_URL as string | undefined)?.trim() || ''
-
 const cameraSrc = computed(() => {
   const u = appliedCameraUrl.value.trim()
   if (u) return u
@@ -614,6 +616,8 @@ async function hydrateAppliedCameraUrl() {
     const j = await getServer()
     appliedCameraUrl.value = (j && typeof j.camera_url === 'string' ? j.camera_url : '') || envCamera
   }
+
+  appliedNovncPwd.value = localStorage.getItem(LS_NOVNC_PWD) ?? ''
 }
 
 //--------//
@@ -679,6 +683,9 @@ async function saveSettings() {
   const url = settingsCameraDraft.value.trim()
   appliedCameraUrl.value = url
   localStorage.setItem(LS_CAMERA, url)
+  const novncPwd = settingsNovncPwdDraft.value
+  appliedNovncPwd.value = novncPwd
+  localStorage.setItem(LS_NOVNC_PWD, novncPwd)
   const serial_roles: Record<string, string> = {}
   for (const k of SERIAL_ROLE_KEYS) {
     const v = serialRolesDraft.value[k]?.trim()
@@ -715,6 +722,7 @@ function clearStoredCamera() {
 watch(settingsOpen, (open) => {
   if (open) {
     settingsCameraDraft.value = appliedCameraUrl.value
+    settingsNovncPwdDraft.value = appliedNovncPwd.value
     void loadSettingsPanelData()
   }
 })
@@ -988,6 +996,23 @@ const statusColor = computed(() => {
             </section>
 
             <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('novnc.section') }}</h3>
+              <p class="mb-3 text-xs leading-relaxed text-pve-muted">
+                {{ t('novnc.proxyExplain') }}
+              </p>
+              <label class="mb-1 block text-xs text-pve-muted">{{ t('novnc.passwordLabel') }}</label>
+              <input
+                v-model="settingsNovncPwdDraft"
+                type="password"
+                autocomplete="off"
+                class="mb-2 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text focus:border-pve-accent focus:outline-none"
+              />
+              <p class="text-xs leading-relaxed text-pve-muted">
+                {{ t('novnc.hint') }}
+              </p>
+            </section>
+
+            <section class="mb-6">
               <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('serial.section') }}</h3>
               <div class="mb-2 flex items-center gap-2">
                 <button
@@ -1077,9 +1102,9 @@ const statusColor = computed(() => {
       </div>
     </Teleport>
 
-    <!-- -------- 模块：主内容区 -------- -->
+    <!-- -------- 模块：主内容区（v-show 保持远程桌面/noVNC 与终端挂载，切换 Tab 不断开） -------- -->
     <div class="flex min-h-0 flex-1 flex-col">
-      <template v-if="mainTab === 'console'">
+      <div v-show="mainTab === 'console'" class="flex min-h-0 flex-1 flex-col">
         <!-- -------- 子模块：控制台 — 视频 + 拓扑图 -------- -->
         <div class="flex min-h-0 flex-1 flex-col lg:flex-row">
           <section
@@ -1152,10 +1177,16 @@ const statusColor = computed(() => {
             </div>
           </div>
         </footer>
-      </template>
+      </div>
 
-      <!-- -------- 子模块：仿桌面（终端/文件等） -------- -->
-      <WebDesktopRoot v-else :log-lines="consoleLines" @open-settings="settingsOpen = true" />
+      <RemoteDesktopTab
+        v-show="mainTab === 'desktop'"
+        class="flex min-h-0 min-w-0 flex-1 flex-col"
+        :log-lines="consoleLines"
+        :novnc-password="appliedNovncPwd"
+        :desktop-active="mainTab === 'desktop'"
+        @open-settings="settingsOpen = true"
+      />
     </div>
 
     <!-- -------- 模块：可拖拽悬浮日志窗口 -------- -->
