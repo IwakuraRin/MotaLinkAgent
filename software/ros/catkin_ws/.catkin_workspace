@@ -1,0 +1,2 @@
+# 标记本目录为 Catkin 工作区根（供 catkin/IDE 识别）；源码在 src/，编译产物在 build/、devel/。
+# This file currently only serves to mark the location of a catkin workspace for tool integration

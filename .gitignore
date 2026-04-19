@@ -1,0 +1,74 @@
+# OmniRoam 仓库忽略规则：通用构建产物 + Catkin / PlatformIO 生成目录。
+# ROS 路径说明见 scripts/setup_ros1.bash 顶部注释。
+#
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+# debug information files
+*.dwo
+
+# ROS 1 Catkin (build artifacts; keep catkin_ws/src/)
+catkin_ws/build/
+catkin_ws/devel/
+catkin_ws/install/
+catkin_ws/logs/
+software/ros/catkin_ws/build/
+software/ros/catkin_ws/devel/
+software/ros/catkin_ws/install/
+software/ros/catkin_ws/logs/
+
+# PlatformIO（simplerobotic/ 内另有 .gitignore）
+simplerobotic/.pio/
+
+# OmniRoam 根目录 start/restart 脚本写入的 PID 与日志
+.omniroam/
