@@ -1,7 +1,0 @@
-web/node_modules/
-web/dist/
-server/hostpc
-*.exe
-hostpc-settings.json
-hostpc-auth-secret
-hostpc-users.db
