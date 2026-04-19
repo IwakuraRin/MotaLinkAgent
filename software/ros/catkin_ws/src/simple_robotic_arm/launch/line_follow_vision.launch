@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 与 usb_cam / uvc_camera 等发布的 sensor_msgs/Image 话题一致 -->
+  <arg name="image_topic" default="/usb_cam/image_raw"/>
+  <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="publish_debug_image" default="false"/>
+
+  <node pkg="simple_robotic_arm" type="line_follow_vision.py" name="line_follow_vision" output="screen">
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+    <param name="publish_debug_image" value="$(arg publish_debug_image)"/>
+    <!-- 单目暗区启发式障碍物检测：仅地面亮、障碍暗时可能有效 -->
+    <param name="obstacle_enable" value="false"/>
+  </node>
+</launch>

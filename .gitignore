@@ -1,5 +1,5 @@
-# simpleRoboticArm 仓库忽略规则：通用构建产物 + catkin_ws 下由 catkin_make 生成的目录。
-# 目录说明见 setup_ros1.bash 顶部注释。
+# OmniRoam 仓库忽略规则：通用构建产物 + Catkin / PlatformIO 生成目录。
+# ROS 路径说明见 scripts/setup_ros1.bash 顶部注释。
 #
 # Prerequisites
 *.d
@@ -62,6 +62,10 @@ catkin_ws/build/
 catkin_ws/devel/
 catkin_ws/install/
 catkin_ws/logs/
+software/ros/catkin_ws/build/
+software/ros/catkin_ws/devel/
+software/ros/catkin_ws/install/
+software/ros/catkin_ws/logs/
 
 # PlatformIO（simplerobotic/ 内另有 .gitignore）
 simplerobotic/.pio/

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="port" default="/dev/ttyUSB0" doc="USB-UART 设备，如 /dev/ttyUSB0 或 /dev/ttyACM0"/>
+  <arg name="baud" default="115200"/>
+
+  <node pkg="simple_robotic_arm" type="esp32_serial_bridge.py" name="esp32_serial_bridge" output="screen">
+    <param name="port" value="$(arg port)"/>
+    <param name="baud" value="$(arg baud)"/>
+  </node>
+</launch>
