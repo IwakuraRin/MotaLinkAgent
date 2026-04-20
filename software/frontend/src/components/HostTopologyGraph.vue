@@ -27,7 +27,6 @@ const EDGES: EdgeDef[] = [
   { id: 'e_http_api', from: 'browser', to: 'hostpc', yOff: 8 },
   { id: 'e_file_settings', from: 'hostpc', to: 'settings_file' },
   { id: 'e_ros_host', from: 'hostpc', to: 'ros' },
-  { id: 'e_serial', from: 'ros', to: 'esp32' },
   { id: 'e_cam', from: 'usbcam', to: 'ros' },
   { id: 'e_vision', from: 'ros', to: 'vision' },
   { id: 'e_video_ui', from: 'browser', to: 'stream' },
@@ -69,16 +68,14 @@ function computeAutoLayout(): NodeDef[] {
 
   const uW = 118
   const vW = 152
-  const eW = 100
   const botGap = 56
-  const botRowW = uW + botGap + vW + botGap + eW
+  const botRowW = uW + botGap + vW
   const bx0 = (VB_W - botRowW) / 2
 
   const usbcam: NodeDef = { id: 'usbcam', x: bx0, y: botY, w: uW, h: 44 }
   const vision: NodeDef = { id: 'vision', x: bx0 + uW + botGap, y: botY, w: vW, h: 44 }
-  const esp32: NodeDef = { id: 'esp32', x: bx0 + uW + botGap + vW + botGap, y: botY, w: eW, h: 44 }
 
-  return [browser, hostpc, ros, settings_file, stream, usbcam, vision, esp32]
+  return [browser, hostpc, ros, settings_file, stream, usbcam, vision]
 }
 
 const nodes = ref<NodeDef[]>(computeAutoLayout())
