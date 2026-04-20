@@ -87,10 +87,12 @@ func (h *hub) sendLogEdge(line, edge string) {
 // persistedSettings is a JSON file so LAN clients share camera URL and serial role → device path bindings. Remote desktop uses /ws/vnc → local TCP VNC.
 // ROS / scripts can read the same file (e.g. jq .serial_roles.esp32_uart hostpc-settings.json).
 type persistedSettings struct {
-	mu          sync.Mutex
-	path        string
-	CameraURL   string            `json:"camera_url"`
-	SerialRoles map[string]string `json:"serial_roles"`
+	mu             sync.Mutex
+	path           string
+	CameraURL      string            `json:"camera_url"`
+	CameraBackend  string            `json:"camera_backend"` // "" or "url" = external URL; "device" = HostPC V4L2 via /api/camera/mjpeg
+	CameraDevice   string            `json:"camera_device"`  // e.g. /dev/video0 when backend is device
+	SerialRoles    map[string]string `json:"serial_roles"`
 }
 
 func (s *persistedSettings) load() {
@@ -107,6 +109,8 @@ func (s *persistedSettings) load() {
 		return
 	}
 	s.CameraURL = strings.TrimSpace(p.CameraURL)
+	s.CameraBackend = normalizeCameraBackend(p.CameraBackend)
+	s.CameraDevice = strings.TrimSpace(p.CameraDevice)
 	if p.SerialRoles != nil {
 		s.SerialRoles = map[string]string{}
 		for k, v := range p.SerialRoles {
@@ -117,6 +121,14 @@ func (s *persistedSettings) load() {
 	}
 }
 
+func normalizeCameraBackend(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "device" {
+		return "device"
+	}
+	return "url"
+}
+
 func (s *persistedSettings) snapshot() map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -125,8 +137,10 @@ func (s *persistedSettings) snapshot() map[string]any {
 		roles[k] = v
 	}
 	return map[string]any{
-		"camera_url":   s.CameraURL,
-		"serial_roles": roles,
+		"camera_url":      s.CameraURL,
+		"camera_backend":  normalizeCameraBackend(s.CameraBackend),
+		"camera_device":   s.CameraDevice,
+		"serial_roles":    roles,
 	}
 }
 
@@ -135,10 +149,12 @@ var allowedSerialRoles = map[string]struct{}{
 	"aux_serial": {},
 }
 
-func (s *persistedSettings) saveAll(cameraURL string, roles map[string]string) error {
+func (s *persistedSettings) saveAll(cameraURL, cameraBackend, cameraDevice string, roles map[string]string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.CameraURL = strings.TrimSpace(cameraURL)
+	s.CameraBackend = normalizeCameraBackend(cameraBackend)
+	s.CameraDevice = strings.TrimSpace(cameraDevice)
 	s.SerialRoles = map[string]string{}
 	if roles != nil {
 		for k, v := range roles {
@@ -153,9 +169,16 @@ func (s *persistedSettings) saveAll(cameraURL string, roles map[string]string) e
 		}
 	}
 	out, err := json.MarshalIndent(struct {
-		CameraURL   string            `json:"camera_url"`
-		SerialRoles map[string]string `json:"serial_roles"`
-	}{CameraURL: s.CameraURL, SerialRoles: s.SerialRoles}, "", "  ")
+		CameraURL     string            `json:"camera_url"`
+		CameraBackend string            `json:"camera_backend"`
+		CameraDevice  string            `json:"camera_device"`
+		SerialRoles   map[string]string `json:"serial_roles"`
+	}{
+		CameraURL:     s.CameraURL,
+		CameraBackend: s.CameraBackend,
+		CameraDevice:  s.CameraDevice,
+		SerialRoles:   s.SerialRoles,
+	}, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -177,13 +200,20 @@ func main() {
 	changelogPath := flag.String("changelog", strings.TrimSpace(os.Getenv("HOSTPC_CHANGELOG_PATH")), "changelog file path in GitHub repo (default CHANGELOG.md)")
 	updateScriptFlag := flag.String("update-script", strings.TrimSpace(os.Getenv("HOSTPC_UPDATE_SCRIPT")), "self-update bash script (default: software/deploy/hostpc-self-update.sh, …)")
 	vncAddrFlag := flag.String("vnc-addr", strings.TrimSpace(os.Getenv("HOSTPC_VNC_ADDR")), "TCP address of local VNC (RFB) for authenticated /ws/vnc WebSocket proxy; empty → 127.0.0.1:5900")
+	cameraDevFlag := flag.String("camera-device", strings.TrimSpace(os.Getenv("HOSTPC_CAMERA_DEVICE")), "default V4L2 device for /api/camera/mjpeg when hostpc-settings.json omits camera_device (default /dev/video0)")
 	flag.Parse()
+
+	fallbackCamDev := strings.TrimSpace(*cameraDevFlag)
+	if fallbackCamDev == "" {
+		fallbackCamDev = "/dev/video0"
+	}
 
 	vncTarget := strings.TrimSpace(*vncAddrFlag)
 	if vncTarget == "" {
 		vncTarget = "127.0.0.1:5900"
 	}
 	log.Printf("VNC WebSocket proxy: /ws/vnc → tcp/%s (override with -vnc-addr or HOSTPC_VNC_ADDR)", vncTarget)
+	log.Printf("Camera MJPEG (Linux): GET /api/camera/mjpeg → ffmpeg + V4L2 default %s (-camera-device / HOSTPC_CAMERA_DEVICE)", fallbackCamDev)
 
 	st, err := os.Stat(*staticDir)
 	if err != nil || !st.IsDir() {
@@ -256,6 +286,8 @@ func main() {
 	mux.HandleFunc("/ws/vnc", ar.requireAuthWS(handleVNCProxyWS(vncTarget)))
 	mux.HandleFunc("/ws/shell", ar.requireAuthWS(handleShellWS))
 
+	mux.HandleFunc("/api/camera/mjpeg", ar.requireAuth(handleCameraMJPEG(store, fallbackCamDev)))
+
 	//--------//
 	// 模块：WebSocket 路由 — 主通道：日志订阅 + 键盘遥控 JSON
 	mux.HandleFunc("/ws", ar.requireAuthWS(func(w http.ResponseWriter, r *http.Request) {
@@ -323,8 +355,10 @@ func main() {
 				return
 			}
 			var in struct {
-				CameraURL   string            `json:"camera_url"`
-				SerialRoles map[string]string `json:"serial_roles"`
+				CameraURL     string            `json:"camera_url"`
+				CameraBackend string            `json:"camera_backend"`
+				CameraDevice  string            `json:"camera_device"`
+				SerialRoles   map[string]string `json:"serial_roles"`
 			}
 			if json.Unmarshal(body, &in) != nil {
 				http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
@@ -333,7 +367,7 @@ func main() {
 			if in.SerialRoles == nil {
 				in.SerialRoles = map[string]string{}
 			}
-			if err := store.saveAll(in.CameraURL, in.SerialRoles); err != nil {
+			if err := store.saveAll(in.CameraURL, in.CameraBackend, in.CameraDevice, in.SerialRoles); err != nil {
 				log.Println("settings save:", err)
 				http.Error(w, `{"error":"write"}`, http.StatusInternalServerError)
 				return
