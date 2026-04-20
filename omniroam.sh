@@ -76,6 +76,17 @@ check_environment() {
     issues=1
   else
     echo "  · Go:   $(command -v go) ($("go" version 2>/dev/null | head -1))"
+    if [[ -n "${BACKEND_DIR:-}" ]] && [[ -d "$BACKEND_DIR" ]]; then
+      if [[ ! -f "$BACKEND_DIR/go.mod" ]]; then
+        echo "  · 缺少: $BACKEND_DIR/go.mod（Go Modules 下 go run 会报错；请拉全仓库含 software/backend/go.mod、go.sum）"
+        issues=1
+      elif [[ ! -f "$BACKEND_DIR/go.sum" ]]; then
+        echo "  · 缺少: $BACKEND_DIR/go.sum（依赖校验不完整；请在 software/backend 执行 go mod tidy）"
+        issues=1
+      else
+        echo "  · Go 模块: go.mod / go.sum 已存在"
+      fi
+    fi
   fi
   if command -v pnpm >/dev/null 2>&1; then
     echo "  · pnpm: $(command -v pnpm) ($("pnpm" --version 2>/dev/null || true))"
@@ -267,6 +278,14 @@ start_hostpc_backend() {
   fi
   if ! command -v go >/dev/null 2>&1; then
     log "ERROR: 未安装 go，无法启动后端"
+    return 1
+  fi
+  if [[ ! -f "$BACKEND_DIR/go.mod" ]]; then
+    log "ERROR: 缺少 $BACKEND_DIR/go.mod — 无法 go run。请从仓库拉取完整 software/backend（含 go.mod、go.sum），或在该目录执行 go mod init / go mod tidy（见 software/backend/README.md）。"
+    return 1
+  fi
+  if [[ ! -f "$BACKEND_DIR/go.sum" ]]; then
+    log "ERROR: 缺少 $BACKEND_DIR/go.sum — 请在 software/backend 执行: go mod tidy"
     return 1
   fi
   ensure_frontend_dist || true
