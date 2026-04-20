@@ -16,6 +16,9 @@ import DeskTerminal from './components/desktop/DeskTerminal.vue'
 import DeskFiles from './components/desktop/DeskFiles.vue'
 
 const LS_CAMERA = 'omniroam.camera_url'
+const LS_CAMERA_BACKEND = 'omniroam.camera_backend'
+const LS_CAMERA_DEVICE = 'omniroam.camera_device'
+const DEFAULT_V4L2_DEVICE = '/dev/video0'
 const LS_MAXLOG = 'omniroam.console_max_lines'
 const LS_KEYBOARD = 'omniroam.keyboard_enabled'
 const LS_PWD_DISMISS = 'omniroam.pwd_dismiss'
@@ -233,7 +236,8 @@ const SERIAL_ROLE_KEYS = ['esp32_uart', 'aux_serial'] as const
 type SerialRoleKey = (typeof SERIAL_ROLE_KEYS)[number]
 
 const consoleLines = ref<string[]>([])
-const camRef = ref<HTMLVideoElement | null>(null)
+const camVideoRef = ref<HTMLVideoElement | null>(null)
+const camImgRef = ref<HTMLImageElement | null>(null)
 const edgeLogs = ref(emptyEdgeLogMap())
 const wsState = ref<'disconnected' | 'connecting' | 'open' | 'error'>('disconnected')
 const keysHeld = ref<Record<string, boolean>>({})
@@ -241,7 +245,11 @@ const lastCmd = ref('')
 
 const settingsOpen = ref(false)
 const settingsCameraDraft = ref('')
+const settingsCameraBackendDraft = ref<'url' | 'device'>('url')
+const settingsCameraDeviceDraft = ref(DEFAULT_V4L2_DEVICE)
 const appliedCameraUrl = ref('')
+const appliedCameraBackend = ref<'url' | 'device'>('url')
+const appliedCameraDevice = ref(DEFAULT_V4L2_DEVICE)
 const maxLogLines = ref(500)
 const keyboardEnabled = ref(true)
 
@@ -255,10 +263,31 @@ const serialRolesDraft = ref<Record<SerialRoleKey, string>>({
 
 const envCamera = (import.meta.env.VITE_CAMERA_URL as string | undefined)?.trim() || ''
 const cameraSrc = computed(() => {
+  if (appliedCameraBackend.value === 'device') return '/api/camera/mjpeg'
   const u = appliedCameraUrl.value.trim()
   if (u) return u
   if (envCamera) return envCamera
   return undefined
+})
+
+function urlLooksLikeMjpeg(u: string): boolean {
+  const x = u.toLowerCase()
+  if (x.includes('.m3u8')) return false
+  return (
+    x.includes('mjpeg') ||
+    x.includes('.mjpg') ||
+    x.includes('mpjpeg') ||
+    x.includes('/mjpeg') ||
+    x.includes('mjpg')
+  )
+}
+
+const cameraUseImage = computed(() => {
+  if (appliedCameraBackend.value === 'device') return true
+  const src = cameraSrc.value
+  if (!src) return false
+  if (src.startsWith('/api/camera/mjpeg')) return true
+  return urlLooksLikeMjpeg(src)
 })
 
 const hostDisplay = typeof window !== 'undefined' ? window.location.host : '—'
@@ -581,34 +610,69 @@ function openPwdFormVoluntary() {
 }
 
 //--------//
-// 模块：摄像头 — 绑定 video 元素、从设置/API hydrate URL
+// 模块：摄像头 — 绑定 video/img、从设置/API hydrate（含本机 V4L2 → /api/camera/mjpeg）
 function bindCamera() {
-  if (!camRef.value) return
   const src = cameraSrc.value
-  if (!src) {
-    camRef.value.removeAttribute('src')
+  if (cameraUseImage.value) {
+    const el = camImgRef.value
+    if (!el) return
+    if (!src) {
+      el.removeAttribute('src')
+      return
+    }
+    el.onload = () => ingestLog(t('log.videoBound'), 'e_video_ui')
+    el.onerror = () => ingestLog(t('log.camFail'), 'e_video_ui')
+    el.src = src
     return
   }
-  camRef.value.src = src
-  camRef.value.muted = true
-  camRef.value
+  const el = camVideoRef.value
+  if (!el) return
+  if (!src) {
+    el.removeAttribute('src')
+    return
+  }
+  el.src = src
+  el.muted = true
+  el
     .play()
     .then(() => ingestLog(t('log.videoBound'), 'e_video_ui'))
     .catch(() => ingestLog(t('log.camFail'), 'e_video_ui'))
 }
 
 async function hydrateAppliedCameraUrl() {
-  let server: { camera_url?: string } | null = null
-  async function getServer() {
+  type CamSettings = {
+    camera_url?: string
+    camera_backend?: string
+    camera_device?: string
+  }
+  let server: CamSettings | null = null
+  async function getServer(): Promise<CamSettings | null> {
     if (server) return server
     try {
       const r = await apiFetch('/api/settings')
-      if (r.ok) server = (await r.json()) as { camera_url?: string }
+      if (r.ok) server = (await r.json()) as CamSettings
       else if (r.status === 401) loggedIn.value = false
     } catch {
       /* dev without backend */
     }
     return server
+  }
+
+  const lsB = localStorage.getItem(LS_CAMERA_BACKEND)
+  if (lsB === 'device' || lsB === 'url') {
+    appliedCameraBackend.value = lsB
+  } else {
+    const j = await getServer()
+    appliedCameraBackend.value = j?.camera_backend === 'device' ? 'device' : 'url'
+  }
+
+  const lsD = localStorage.getItem(LS_CAMERA_DEVICE)
+  if (lsD !== null) {
+    appliedCameraDevice.value = lsD.trim() || DEFAULT_V4L2_DEVICE
+  } else {
+    const j = await getServer()
+    const d = j && typeof j.camera_device === 'string' ? j.camera_device.trim() : ''
+    appliedCameraDevice.value = d || DEFAULT_V4L2_DEVICE
   }
 
   const lsCam = localStorage.getItem(LS_CAMERA)
@@ -618,7 +682,6 @@ async function hydrateAppliedCameraUrl() {
     const j = await getServer()
     appliedCameraUrl.value = (j && typeof j.camera_url === 'string' ? j.camera_url : '') || envCamera
   }
-
 }
 
 //--------//
@@ -682,8 +745,14 @@ function onLangChange(e: Event) {
 
 async function saveSettings() {
   const url = settingsCameraDraft.value.trim()
+  const backend = settingsCameraBackendDraft.value
+  const dev = settingsCameraDeviceDraft.value.trim() || DEFAULT_V4L2_DEVICE
   appliedCameraUrl.value = url
+  appliedCameraBackend.value = backend
+  appliedCameraDevice.value = dev
   localStorage.setItem(LS_CAMERA, url)
+  localStorage.setItem(LS_CAMERA_BACKEND, backend)
+  localStorage.setItem(LS_CAMERA_DEVICE, dev)
   const serial_roles: Record<string, string> = {}
   for (const k of SERIAL_ROLE_KEYS) {
     const v = serialRolesDraft.value[k]?.trim()
@@ -693,7 +762,12 @@ async function saveSettings() {
     const r = await apiFetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ camera_url: url, serial_roles }),
+      body: JSON.stringify({
+        camera_url: url,
+        camera_backend: backend,
+        camera_device: dev,
+        serial_roles,
+      }),
     })
     if (r.status === 401) {
       loggedIn.value = false
@@ -712,19 +786,31 @@ async function saveSettings() {
 
 function clearStoredCamera() {
   settingsCameraDraft.value = ''
+  settingsCameraBackendDraft.value = 'url'
+  settingsCameraDeviceDraft.value = DEFAULT_V4L2_DEVICE
   appliedCameraUrl.value = ''
+  appliedCameraBackend.value = 'url'
+  appliedCameraDevice.value = DEFAULT_V4L2_DEVICE
   localStorage.removeItem(LS_CAMERA)
+  localStorage.removeItem(LS_CAMERA_BACKEND)
+  localStorage.removeItem(LS_CAMERA_DEVICE)
   void saveSettings()
 }
 
 watch(settingsOpen, (open) => {
   if (open) {
     settingsCameraDraft.value = appliedCameraUrl.value
+    settingsCameraBackendDraft.value = appliedCameraBackend.value
+    settingsCameraDeviceDraft.value = appliedCameraDevice.value
     void loadSettingsPanelData()
   }
 })
 
 watch(cameraSrc, () => {
+  void nextTick(() => bindCamera())
+})
+
+watch(cameraUseImage, () => {
   void nextTick(() => bindCamera())
 })
 
@@ -976,13 +1062,35 @@ const statusColor = computed(() => {
 
             <section class="mb-6">
               <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('video.section') }}</h3>
-              <label class="mb-1 block text-xs text-pve-muted">{{ t('video.label') }}</label>
-              <textarea
-                v-model="settingsCameraDraft"
-                rows="3"
-                class="mb-2 w-full resize-y rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text placeholder:text-pve-muted focus:border-pve-accent focus:outline-none"
-                :placeholder="t('video.placeholder')"
-              />
+              <div class="mb-3 flex flex-wrap gap-4 text-xs text-pve-text">
+                <label class="flex cursor-pointer items-center gap-2">
+                  <input v-model="settingsCameraBackendDraft" type="radio" value="url" class="accent-pve-accent" />
+                  {{ t('video.modeUrl') }}
+                </label>
+                <label class="flex cursor-pointer items-center gap-2">
+                  <input v-model="settingsCameraBackendDraft" type="radio" value="device" class="accent-pve-accent" />
+                  {{ t('video.modeDevice') }}
+                </label>
+              </div>
+              <template v-if="settingsCameraBackendDraft === 'url'">
+                <label class="mb-1 block text-xs text-pve-muted">{{ t('video.label') }}</label>
+                <textarea
+                  v-model="settingsCameraDraft"
+                  rows="3"
+                  class="mb-2 w-full resize-y rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text placeholder:text-pve-muted focus:border-pve-accent focus:outline-none"
+                  :placeholder="t('video.placeholder')"
+                />
+              </template>
+              <template v-else>
+                <label class="mb-1 block text-xs text-pve-muted">{{ t('video.devicePath') }}</label>
+                <input
+                  v-model="settingsCameraDeviceDraft"
+                  type="text"
+                  class="mb-2 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text focus:border-pve-accent focus:outline-none"
+                  :placeholder="DEFAULT_V4L2_DEVICE"
+                />
+                <p class="mb-2 text-xs text-pve-muted">{{ t('video.deviceHint') }}</p>
+              </template>
               <p class="mb-3 text-xs leading-relaxed text-pve-muted">
                 {{ t('video.hint') }}
               </p>
@@ -1107,9 +1215,15 @@ const statusColor = computed(() => {
               <span v-if="!cameraSrc" class="normal-case text-pve-warn">{{ t('video.noUrl') }}</span>
             </div>
             <div class="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+              <img
+                v-if="cameraSrc && cameraUseImage"
+                ref="camImgRef"
+                class="max-h-full max-w-full object-contain"
+                alt=""
+              />
               <video
-                v-if="cameraSrc"
-                ref="camRef"
+                v-else-if="cameraSrc"
+                ref="camVideoRef"
                 class="max-h-full max-w-full object-contain"
                 playsinline
                 autoplay
