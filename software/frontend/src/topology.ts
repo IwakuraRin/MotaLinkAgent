@@ -9,7 +9,6 @@ export const TOPOLOGY_EDGE_IDS = [
   'e_http_api',
   'e_file_settings',
   'e_ros_host',
-  'e_serial',
   'e_cam',
   'e_vision',
   'e_video_ui',

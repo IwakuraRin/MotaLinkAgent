@@ -265,18 +265,6 @@ func main() {
 	mux := http.NewServeMux()
 
 	//--------//
-	// 模块：演示日志 — 定时向拓扑边推送占位行（可替换为 rostopic/串口）
-	// Demo + placeholder for ROS/serial: push synthetic lines periodically
-	go func() {
-		t := time.NewTicker(4 * time.Second)
-		n := 0
-		for range t.C {
-			n++
-			h.sendLogEdge(fmt.Sprintf("INFO  [demo] host tick #%d — replace with `rostopic echo` / serial reader", n), "e_ros_host")
-		}
-	}()
-
-	//--------//
 	// 模块：HTTP 路由 — 登录/登出/会话/改密
 	mux.HandleFunc("/api/auth/login", ar.handleLogin)
 	mux.HandleFunc("/api/auth/logout", ar.handleLogout)
@@ -320,7 +308,6 @@ func main() {
 				}
 				line := fmt.Sprintf("CTRL  key %s %s — (wire to chassis /cmd_vel or ESP32)", strings.ToUpper(p.Key), state)
 				h.sendLogEdge(line, "e_ws")
-				h.sendLogEdge(fmt.Sprintf("PIPE  chassis/serial ← key %s %s", strings.ToUpper(p.Key), state), "e_serial")
 				_ = c.WriteJSON(map[string]string{
 					"type": "ack",
 					"msg":  "key " + p.Key + " " + state,
