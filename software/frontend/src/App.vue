@@ -16,9 +16,6 @@ import DeskTerminal from './components/desktop/DeskTerminal.vue'
 import DeskFiles from './components/desktop/DeskFiles.vue'
 
 const LS_CAMERA = 'omniroam.camera_url'
-const LS_CAMERA_BACKEND = 'omniroam.camera_backend'
-const LS_CAMERA_DEVICE = 'omniroam.camera_device'
-const DEFAULT_V4L2_DEVICE = '/dev/video0'
 const LS_MAXLOG = 'omniroam.console_max_lines'
 const LS_KEYBOARD = 'omniroam.keyboard_enabled'
 const LS_PWD_DISMISS = 'omniroam.pwd_dismiss'
@@ -245,11 +242,7 @@ const lastCmd = ref('')
 
 const settingsOpen = ref(false)
 const settingsCameraDraft = ref('')
-const settingsCameraBackendDraft = ref<'url' | 'device'>('url')
-const settingsCameraDeviceDraft = ref(DEFAULT_V4L2_DEVICE)
 const appliedCameraUrl = ref('')
-const appliedCameraBackend = ref<'url' | 'device'>('url')
-const appliedCameraDevice = ref(DEFAULT_V4L2_DEVICE)
 const maxLogLines = ref(500)
 const keyboardEnabled = ref(true)
 
@@ -263,7 +256,6 @@ const serialRolesDraft = ref<Record<SerialRoleKey, string>>({
 
 const envCamera = (import.meta.env.VITE_CAMERA_URL as string | undefined)?.trim() || ''
 const cameraSrc = computed(() => {
-  if (appliedCameraBackend.value === 'device') return '/api/camera/mjpeg'
   const u = appliedCameraUrl.value.trim()
   if (u) return u
   if (envCamera) return envCamera
@@ -283,10 +275,8 @@ function urlLooksLikeMjpeg(u: string): boolean {
 }
 
 const cameraUseImage = computed(() => {
-  if (appliedCameraBackend.value === 'device') return true
   const src = cameraSrc.value
   if (!src) return false
-  if (src.startsWith('/api/camera/mjpeg')) return true
   return urlLooksLikeMjpeg(src)
 })
 
@@ -610,7 +600,7 @@ function openPwdFormVoluntary() {
 }
 
 //--------//
-// 模块：摄像头 — 绑定 video/img、从设置/API hydrate（含本机 V4L2 → /api/camera/mjpeg）
+// 模块：摄像头 — 绑定 video/img、从设置/API hydrate（仅外部流 URL）
 function bindCamera() {
   const src = cameraSrc.value
   if (cameraUseImage.value) {
@@ -642,8 +632,6 @@ function bindCamera() {
 async function hydrateAppliedCameraUrl() {
   type CamSettings = {
     camera_url?: string
-    camera_backend?: string
-    camera_device?: string
   }
   let server: CamSettings | null = null
   async function getServer(): Promise<CamSettings | null> {
@@ -656,23 +644,6 @@ async function hydrateAppliedCameraUrl() {
       /* dev without backend */
     }
     return server
-  }
-
-  const lsB = localStorage.getItem(LS_CAMERA_BACKEND)
-  if (lsB === 'device' || lsB === 'url') {
-    appliedCameraBackend.value = lsB
-  } else {
-    const j = await getServer()
-    appliedCameraBackend.value = j?.camera_backend === 'device' ? 'device' : 'url'
-  }
-
-  const lsD = localStorage.getItem(LS_CAMERA_DEVICE)
-  if (lsD !== null) {
-    appliedCameraDevice.value = lsD.trim() || DEFAULT_V4L2_DEVICE
-  } else {
-    const j = await getServer()
-    const d = j && typeof j.camera_device === 'string' ? j.camera_device.trim() : ''
-    appliedCameraDevice.value = d || DEFAULT_V4L2_DEVICE
   }
 
   const lsCam = localStorage.getItem(LS_CAMERA)
@@ -745,14 +716,8 @@ function onLangChange(e: Event) {
 
 async function saveSettings() {
   const url = settingsCameraDraft.value.trim()
-  const backend = settingsCameraBackendDraft.value
-  const dev = settingsCameraDeviceDraft.value.trim() || DEFAULT_V4L2_DEVICE
   appliedCameraUrl.value = url
-  appliedCameraBackend.value = backend
-  appliedCameraDevice.value = dev
   localStorage.setItem(LS_CAMERA, url)
-  localStorage.setItem(LS_CAMERA_BACKEND, backend)
-  localStorage.setItem(LS_CAMERA_DEVICE, dev)
   const serial_roles: Record<string, string> = {}
   for (const k of SERIAL_ROLE_KEYS) {
     const v = serialRolesDraft.value[k]?.trim()
@@ -764,8 +729,6 @@ async function saveSettings() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         camera_url: url,
-        camera_backend: backend,
-        camera_device: dev,
         serial_roles,
       }),
     })
@@ -786,22 +749,14 @@ async function saveSettings() {
 
 function clearStoredCamera() {
   settingsCameraDraft.value = ''
-  settingsCameraBackendDraft.value = 'url'
-  settingsCameraDeviceDraft.value = DEFAULT_V4L2_DEVICE
   appliedCameraUrl.value = ''
-  appliedCameraBackend.value = 'url'
-  appliedCameraDevice.value = DEFAULT_V4L2_DEVICE
   localStorage.removeItem(LS_CAMERA)
-  localStorage.removeItem(LS_CAMERA_BACKEND)
-  localStorage.removeItem(LS_CAMERA_DEVICE)
   void saveSettings()
 }
 
 watch(settingsOpen, (open) => {
   if (open) {
     settingsCameraDraft.value = appliedCameraUrl.value
-    settingsCameraBackendDraft.value = appliedCameraBackend.value
-    settingsCameraDeviceDraft.value = appliedCameraDevice.value
     void loadSettingsPanelData()
   }
 })
@@ -1062,35 +1017,13 @@ const statusColor = computed(() => {
 
             <section class="mb-6">
               <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('video.section') }}</h3>
-              <div class="mb-3 flex flex-wrap gap-4 text-xs text-pve-text">
-                <label class="flex cursor-pointer items-center gap-2">
-                  <input v-model="settingsCameraBackendDraft" type="radio" value="url" class="accent-pve-accent" />
-                  {{ t('video.modeUrl') }}
-                </label>
-                <label class="flex cursor-pointer items-center gap-2">
-                  <input v-model="settingsCameraBackendDraft" type="radio" value="device" class="accent-pve-accent" />
-                  {{ t('video.modeDevice') }}
-                </label>
-              </div>
-              <template v-if="settingsCameraBackendDraft === 'url'">
-                <label class="mb-1 block text-xs text-pve-muted">{{ t('video.label') }}</label>
-                <textarea
-                  v-model="settingsCameraDraft"
-                  rows="3"
-                  class="mb-2 w-full resize-y rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text placeholder:text-pve-muted focus:border-pve-accent focus:outline-none"
-                  :placeholder="t('video.placeholder')"
-                />
-              </template>
-              <template v-else>
-                <label class="mb-1 block text-xs text-pve-muted">{{ t('video.devicePath') }}</label>
-                <input
-                  v-model="settingsCameraDeviceDraft"
-                  type="text"
-                  class="mb-2 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text focus:border-pve-accent focus:outline-none"
-                  :placeholder="DEFAULT_V4L2_DEVICE"
-                />
-                <p class="mb-2 text-xs text-pve-muted">{{ t('video.deviceHint') }}</p>
-              </template>
+              <label class="mb-1 block text-xs text-pve-muted">{{ t('video.label') }}</label>
+              <textarea
+                v-model="settingsCameraDraft"
+                rows="3"
+                class="mb-2 w-full resize-y rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text placeholder:text-pve-muted focus:border-pve-accent focus:outline-none"
+                :placeholder="t('video.placeholder')"
+              />
               <p class="mb-3 text-xs leading-relaxed text-pve-muted">
                 {{ t('video.hint') }}
               </p>
