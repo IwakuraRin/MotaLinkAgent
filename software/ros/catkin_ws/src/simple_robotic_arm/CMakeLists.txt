@@ -169,6 +169,7 @@ catkin_install_python(PROGRAMS
   scripts/arm_kinematics.py
   scripts/chassis_kinematics.py
   scripts/line_follow_vision.py
+  scripts/opencv_obstacle_avoidance.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
