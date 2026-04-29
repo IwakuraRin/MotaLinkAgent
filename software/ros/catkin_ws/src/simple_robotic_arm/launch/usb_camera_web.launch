@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Physical camera device on the HostPC. Use v4l2-ctl to list devices. -->
+  <arg name="video_device" default="/dev/video0"/>
+  <arg name="image_width" default="640"/>
+  <arg name="image_height" default="480"/>
+  <arg name="framerate" default="30"/>
+  <arg name="pixel_format" default="yuyv"/>
+  <arg name="camera_frame_id" default="usb_camera"/>
+
+  <!-- ROS topic consumed by line_follow_vision.py and web_video_server. -->
+  <arg name="image_topic" default="/usb_cam/image_raw"/>
+  <arg name="cmd_vel_topic" default="/cmd_vel"/>
+
+  <!-- Browser MJPEG endpoint: http://HOST:8081/stream?topic=/usb_cam/image_raw -->
+  <arg name="web_video_port" default="8081"/>
+  <arg name="web_video_address" default="0.0.0.0"/>
+
+  <!-- Set true to run the existing OpenCV line-following node against the same camera feed. -->
+  <arg name="start_line_follow" default="false"/>
+  <arg name="publish_debug_image" default="false"/>
+
+  <node pkg="usb_cam" type="usb_cam_node" name="usb_cam" output="screen">
+    <param name="video_device" value="$(arg video_device)"/>
+    <param name="image_width" value="$(arg image_width)"/>
+    <param name="image_height" value="$(arg image_height)"/>
+    <param name="framerate" value="$(arg framerate)"/>
+    <param name="pixel_format" value="$(arg pixel_format)"/>
+    <param name="camera_frame_id" value="$(arg camera_frame_id)"/>
+    <remap from="image_raw" to="$(arg image_topic)"/>
+  </node>
+
+  <node pkg="web_video_server" type="web_video_server" name="web_video_server" output="screen">
+    <param name="port" value="$(arg web_video_port)"/>
+    <param name="address" value="$(arg web_video_address)"/>
+  </node>
+
+  <group if="$(arg start_line_follow)">
+    <node pkg="simple_robotic_arm" type="line_follow_vision.py" name="line_follow_vision" output="screen">
+      <param name="image_topic" value="$(arg image_topic)"/>
+      <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+      <param name="publish_debug_image" value="$(arg publish_debug_image)"/>
+      <param name="obstacle_enable" value="false"/>
+    </node>
+  </group>
+</launch>
