@@ -74,4 +74,5 @@ simplerobotic/.pio/
 .omniroam/
 
 # HostPC local runtime settings
+!software/backend/go.mod
 software/backend/hostpc-settings.json

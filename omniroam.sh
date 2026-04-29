@@ -231,10 +231,10 @@ start_ros_layer() {
     return 0
   fi
   # shellcheck source=/dev/null
-  source /opt/ros/noetic/setup.bash
+  set +u; source /opt/ros/noetic/setup.bash; set -u
   if [[ -f "$CATKIN_WS/devel/setup.bash" ]]; then
     # shellcheck source=/dev/null
-    source "$CATKIN_WS/devel/setup.bash"
+    set +u; source "$CATKIN_WS/devel/setup.bash"; set -u
   fi
   if ! pgrep -f rosmaster >/dev/null 2>&1; then
     log "启动 roscore → $LOGDIR/roscore.log"
@@ -307,11 +307,13 @@ start_hostpc_backend() {
   nohup "${RUN[@]}" >"$LOGDIR/hostpc.log" 2>&1 &
   echo $! >"$STATEDIR/hostpc.pid"
   log "hostpc pid $(cat "$STATEDIR/hostpc.pid")"
-  sleep 2
-  if curl -sf -o /dev/null "http://127.0.0.1:8080/"; then
-    log "后端 HTTP 探测成功"
-    return 0
-  fi
+  for _ in {1..20}; do
+    if curl -sf -o /dev/null "http://127.0.0.1:8080/"; then
+      log "后端 HTTP 探测成功"
+      return 0
+    fi
+    sleep 1
+  done
   log "WARN: 后端暂未响应 8080，请查看 $LOGDIR/hostpc.log"
   return 1
 }
@@ -405,10 +407,10 @@ menu_loop() {
         OMNIROAM_SKIP_ROS=0
         if [[ -f /opt/ros/noetic/setup.bash ]]; then
           # shellcheck source=/dev/null
-          source /opt/ros/noetic/setup.bash
+          set +u; source /opt/ros/noetic/setup.bash; set -u
           if [[ -f "$CATKIN_WS/devel/setup.bash" ]]; then
             # shellcheck source=/dev/null
-            source "$CATKIN_WS/devel/setup.bash"
+            set +u; source "$CATKIN_WS/devel/setup.bash"; set -u
           fi
           if ! pgrep -f rosmaster >/dev/null 2>&1; then
             nohup roscore >"$LOGDIR/roscore.log" 2>&1 &
