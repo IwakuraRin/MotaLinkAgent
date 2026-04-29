@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="image_topic" default="/usb_cam/image_raw"/>
+  <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="publish_debug_image" default="true"/>
+
+  <node pkg="simple_robotic_arm" type="opencv_obstacle_avoidance.py" name="opencv_obstacle_avoidance" output="screen">
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+    <param name="publish_debug_image" value="$(arg publish_debug_image)"/>
+
+    <!-- Conservative defaults for monocular RGB. Tune per camera height/floor. -->
+    <param name="forward_speed" value="0.08"/>
+    <param name="slow_speed" value="0.04"/>
+    <param name="turn_speed" value="0.45"/>
+    <param name="center_stop_ratio" value="0.18"/>
+    <param name="side_slow_ratio" value="0.24"/>
+    <param name="roi_y0" value="0.38"/>
+    <param name="roi_y1" value="0.88"/>
+    <param name="roi_x0" value="0.12"/>
+    <param name="roi_x1" value="0.88"/>
+  </node>
+</launch>
