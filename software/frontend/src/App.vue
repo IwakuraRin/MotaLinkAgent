@@ -277,7 +277,8 @@ function urlLooksLikeMjpeg(u: string): boolean {
     x.includes('.mjpg') ||
     x.includes('mpjpeg') ||
     x.includes('/mjpeg') ||
-    x.includes('mjpg')
+    x.includes('mjpg') ||
+    x.includes('/stream?topic=')
   )
 }
 
