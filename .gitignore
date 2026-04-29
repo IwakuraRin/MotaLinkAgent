@@ -72,3 +72,6 @@ simplerobotic/.pio/
 
 # OmniRoam 根目录 start/restart 脚本写入的 PID 与日志
 .omniroam/
+
+# HostPC local runtime settings
+software/backend/hostpc-settings.json
