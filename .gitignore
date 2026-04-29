@@ -76,3 +76,6 @@ simplerobotic/.pio/
 # HostPC local runtime settings
 !software/backend/go.mod
 software/backend/hostpc-settings.json
+
+# HostPC root runtime settings
+hostpc-settings.json

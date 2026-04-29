@@ -255,10 +255,17 @@ const serialRolesDraft = ref<Record<SerialRoleKey, string>>({
 })
 
 const envCamera = (import.meta.env.VITE_CAMERA_URL as string | undefined)?.trim() || ''
+const autoCamera = (() => {
+  if (typeof window === 'undefined') return ''
+  const host = window.location.hostname
+  if (!host) return ''
+  return `http://${host}:8081/stream?topic=/usb_cam/image_raw`
+})()
 const cameraSrc = computed(() => {
   const u = appliedCameraUrl.value.trim()
   if (u) return u
   if (envCamera) return envCamera
+  if (autoCamera) return autoCamera
   return undefined
 })
 
@@ -651,7 +658,7 @@ async function hydrateAppliedCameraUrl() {
     appliedCameraUrl.value = lsCam
   } else {
     const j = await getServer()
-    appliedCameraUrl.value = (j && typeof j.camera_url === 'string' ? j.camera_url : '') || envCamera
+    appliedCameraUrl.value = (j && typeof j.camera_url === 'string' ? j.camera_url : '') || envCamera || autoCamera
   }
 }
 
