@@ -77,7 +77,7 @@ const M: Record<Locale, Record<string, string>> = {
     'serial.emptyList': 'No serial devices found. Plug in USB-UART and click Refresh (Linux + dialout group).',
     'conn.section': 'Connection',
     'conn.reconnectWs': 'Reconnect WebSocket',
-    'conn.hint': 'Use after the Go server restarts or the link drops.',
+    'conn.hint': 'Use after the C server restarts or the link drops.',
     'ctrl.section': 'Control',
     'ctrl.keyboard': 'Keyboard chassis control (W A S D Q E)',
     'ctrl.hint': 'Turn off to type in other fields without moving the robot.',
@@ -123,7 +123,7 @@ const M: Record<Locale, Record<string, string>> = {
     'graph.edgeLogBtnHint': 'Open log for this link',
     'graph.edgeLogClose': 'Close log panel',
     'graph.node.browser': 'Browser',
-    'graph.node.hostpc': 'HostPC (Go)',
+    'graph.node.hostpc': 'HostPC (C)',
     'graph.node.settings_file': 'hostpc-settings.json',
     'graph.node.ros': 'ROS Noetic',
     'graph.node.stream': 'MJPEG / HLS / HostPC',
@@ -154,7 +154,7 @@ const M: Record<Locale, Record<string, string>> = {
     'novnc.disconnectUnclean': 'Connection dropped unexpectedly.',
     'novnc.section': 'Remote desktop (noVNC)',
     'novnc.proxyExplain':
-      'The page connects to this same HostPC at /ws/vnc (after login). HostPC forwards that WebSocket to a local TCP VNC port — no URL to type in the browser. Default target is 127.0.0.1:5900 on the machine running the Go server.',
+      'The page connects to this same HostPC at /ws/vnc (after login). HostPC forwards that WebSocket to a local TCP VNC port — no URL to type in the browser. Default target is 127.0.0.1:5900 on the machine running the C server.',
     'novnc.hint':
       'If your VNC uses a password, set it below (stored only in this browser). To point at another host/port, set HOSTPC_VNC_ADDR or start HostPC with -vnc-addr.',
     'novnc.passwordLabel': 'VNC password (optional, this browser only)',
@@ -172,12 +172,12 @@ const M: Record<Locale, Record<string, string>> = {
     'desktop.app.about': 'About',
     'desktop.app.settings': 'Settings',
     'desktop.iconHint':
-      'Double-click an icon to open. Terminal: real shell on the host; Files: browse the Linux filesystem (same Unix permissions as the Go process).',
-    'desktop.shell.banner': 'Host PTY — session on the machine running HostPC (Go).',
+      'Double-click an icon to open. Terminal: real shell on the host; Files: browse the Linux filesystem (same Unix permissions as the C process).',
+    'desktop.shell.banner': 'Host PTY — session on the machine running HostPC (C).',
     'desktop.shell.connectFail': '[host] WebSocket /ws/shell could not open.',
     'desktop.shell.disconnected': '[host] Shell session ended (disconnect or process exit).',
     'desktop.shell.devHint':
-      'Dev: from OmniOS/backend run `go run . -static ../frontend/dist` on :8080, then in OmniOS/frontend `pnpm dev` — Vite proxies /ws to 8080.',
+      'Dev: from OmniOS/backend run `make run` on :8080, then in OmniOS/frontend `pnpm dev` — Vite proxies /ws to 8080.',
     'desktop.aboutTitle': 'OmniRoam host UI',
     'desktop.aboutBody1':
       'This tab is a lightweight graphical shell: draggable windows, a taskbar, and small tools that mirror parts of the main console.',
@@ -216,7 +216,7 @@ const M: Record<Locale, Record<string, string>> = {
     'update.later': 'Not now',
     'update.countdownTitle': 'Confirm again',
     'update.countdownBody':
-      'The host will run git pull, rebuild the web UI and Go binary, and reinstall the service (brief downtime).',
+      'The host will run git pull, rebuild the web UI and C binary, and reinstall the service (brief downtime).',
     'update.countdownWait': 'Wait {{n}} s — the confirm button unlocks after the countdown.',
     'update.sureQuestion': 'Are you sure you want to update?',
     'update.startDeploy': 'Confirm update',
@@ -287,7 +287,7 @@ const M: Record<Locale, Record<string, string>> = {
     'serial.emptyList': '未发现串口设备。请插入 USB 转串口后点刷新（需 Linux 且在 dialout 组）。',
     'conn.section': '连接',
     'conn.reconnectWs': '重连 WebSocket',
-    'conn.hint': '在 Go 服务重启或断线后使用。',
+    'conn.hint': '在 C 服务重启或断线后使用。',
     'ctrl.section': '控制',
     'ctrl.keyboard': '键盘控制底盘（W A S D Q E）',
     'ctrl.hint': '关闭后在其他输入框打字不会误动车。',
@@ -332,7 +332,7 @@ const M: Record<Locale, Record<string, string>> = {
     'graph.edgeLogBtnHint': '点击查看此连接上的日志',
     'graph.edgeLogClose': '关闭日志',
     'graph.node.browser': '浏览器',
-    'graph.node.hostpc': '上位机 Go',
+    'graph.node.hostpc': '上位机 C',
     'graph.node.settings_file': 'hostpc-settings.json',
     'graph.node.ros': 'ROS Noetic',
     'graph.node.stream': 'MJPEG / HLS / HostPC',
@@ -363,7 +363,7 @@ const M: Record<Locale, Record<string, string>> = {
     'novnc.disconnectUnclean': '连接异常中断。',
     'novnc.section': '远程桌面 (noVNC)',
     'novnc.proxyExplain':
-      '网页在登录后直接连本站的 /ws/vnc，由 HostPC 把 WebSocket 转到本机 TCP VNC 端口，无需在浏览器里填地址。默认转发到运行 Go 服务那台机器的 127.0.0.1:5900。',
+      '网页在登录后直接连本站的 /ws/vnc，由 HostPC 把 WebSocket 转到本机 TCP VNC 端口，无需在浏览器里填地址。默认转发到运行 C 服务那台机器的 127.0.0.1:5900。',
     'novnc.hint':
       '若 VNC 有密码，在下方填写（仅保存在本浏览器）。若要改目标主机或端口，请设置环境变量 HOSTPC_VNC_ADDR 或使用启动参数 -vnc-addr。',
     'novnc.passwordLabel': 'VNC 密码（可选，仅本浏览器）',
@@ -381,12 +381,12 @@ const M: Record<Locale, Record<string, string>> = {
     'desktop.app.about': '关于',
     'desktop.app.settings': '设置',
     'desktop.iconHint':
-      '双击图标打开。终端为真实 shell；文件管理可浏览上位机 Linux 目录（权限与 Go 进程相同）。',
-    'desktop.shell.banner': '主机 PTY — 与 HostPC（Go）服务同一台机器上的会话。',
+      '双击图标打开。终端为真实 shell；文件管理可浏览上位机 Linux 目录（权限与 C 进程相同）。',
+    'desktop.shell.banner': '主机 PTY — 与 HostPC（C）服务同一台机器上的会话。',
     'desktop.shell.connectFail': '[上位机] 无法打开 WebSocket /ws/shell。',
     'desktop.shell.disconnected': '[上位机] Shell 会话已结束（断开或进程退出）。',
     'desktop.shell.devHint':
-      '开发：先在 OmniOS/backend 执行 go run . -static ../frontend/dist 监听 8080，再在 OmniOS/frontend 执行 pnpm dev；Vite 会把 /ws 转到 8080。',
+      '开发：先在 OmniOS/backend 执行 make run 监听 8080，再在 OmniOS/frontend 执行 pnpm dev；Vite 会把 /ws 转到 8080。',
     'desktop.aboutTitle': 'OmniRoam 上位机界面',
     'desktop.aboutBody1': '此标签为轻量图形壳：可拖拽窗口、任务栏，以及对应主控制台部分功能的小工具。',
     'desktop.aboutBody2':
@@ -410,7 +410,7 @@ const M: Record<Locale, Record<string, string>> = {
     'fs.loadError': '无法加载此目录。',
     'fs.unauthorized': '会话已失效，请重新登录。',
     'fs.truncated': '条目过多，列表已截断。',
-    'fs.hint': '单击文件夹一行即可进入。可见范围取决于 Go 服务进程的系统用户权限；部分系统目录会提示无权限。',
+    'fs.hint': '单击文件夹一行即可进入。可见范围取决于 C 服务进程的系统用户权限；部分系统目录会提示无权限。',
     'update.title': '软件更新',
     'update.available': '检测到本机 Git 仓库落后于远程。请查看更新日志后确认是否更新。',
     'update.shas': '本地 {{local}} · 远程 {{remote}}（{{branch}}）',
@@ -422,7 +422,7 @@ const M: Record<Locale, Record<string, string>> = {
     'update.confirm': '确定',
     'update.later': '稍后',
     'update.countdownTitle': '再次确认',
-    'update.countdownBody': '即将执行 git pull、重新构建前端与 Go 二进制，并重新安装服务（会有短暂中断）。',
+    'update.countdownBody': '即将执行 git pull、重新构建前端与 C 二进制，并重新安装服务（会有短暂中断）。',
     'update.countdownWait': '请等待 {{n}} 秒 — 倒计时结束后「确定更新」按钮才可点击。',
     'update.sureQuestion': '是否确定要更新？',
     'update.startDeploy': '确定更新',
@@ -494,7 +494,7 @@ const M: Record<Locale, Record<string, string>> = {
     'serial.emptyList': '시리얼 장치가 없습니다. USB-UART를 연결한 뒤 새로 고침하세요(Linux, dialout 그룹).',
     'conn.section': '연결',
     'conn.reconnectWs': 'WebSocket 다시 연결',
-    'conn.hint': 'Go 서버 재시작 또는 연결 끊김 후 사용하세요.',
+    'conn.hint': 'C 서버 재시작 또는 연결 끊김 후 사용하세요.',
     'ctrl.section': '조작',
     'ctrl.keyboard': '키보드 섀시 조작 (W A S D Q E)',
     'ctrl.hint': '끄면 다른 입력란에서 타이핑해도 로봇이 움직이지 않습니다.',
@@ -540,7 +540,7 @@ const M: Record<Locale, Record<string, string>> = {
     'graph.edgeLogBtnHint': '이 링크 로그 열기',
     'graph.edgeLogClose': '로그 닫기',
     'graph.node.browser': '브라우저',
-    'graph.node.hostpc': 'HostPC (Go)',
+    'graph.node.hostpc': 'HostPC (C)',
     'graph.node.settings_file': 'hostpc-settings.json',
     'graph.node.ros': 'ROS Noetic',
     'graph.node.stream': 'MJPEG / HLS / HostPC',
@@ -571,7 +571,7 @@ const M: Record<Locale, Record<string, string>> = {
     'novnc.disconnectUnclean': '연결이 비정상적으로 끊겼습니다.',
     'novnc.section': '원격 데스크톱 (noVNC)',
     'novnc.proxyExplain':
-      '로그인 후 같은 HostPC의 /ws/vnc로 연결되며, HostPC가 로컬 TCP VNC 포트로 중계합니다. 브라우저에 WebSocket URL을 입력할 필요가 없습니다. 기본은 Go 서버가 돌아가는 머신의 127.0.0.1:5900입니다.',
+      '로그인 후 같은 HostPC의 /ws/vnc로 연결되며, HostPC가 로컬 TCP VNC 포트로 중계합니다. 브라우저에 WebSocket URL을 입력할 필요가 없습니다. 기본은 C 서버가 돌아가는 머신의 127.0.0.1:5900입니다.',
     'novnc.hint':
       'VNC 비밀번호가 있으면 아래에 입력(이 브라우저에만 저장). 호스트/포트를 바꾸려면 HOSTPC_VNC_ADDR 또는 -vnc-addr을 사용하세요.',
     'novnc.passwordLabel': 'VNC 비밀번호(선택, 이 브라우저만)',
@@ -589,12 +589,12 @@ const M: Record<Locale, Record<string, string>> = {
     'desktop.app.about': '정보',
     'desktop.app.settings': '설정',
     'desktop.iconHint':
-      '아이콘을 두 번 클릭하세요. 터미널: 실제 셸; 파일 탐색: Linux 파일 시스템(Go 프로세스와 동일 권한).',
-    'desktop.shell.banner': '호스트 PTY — HostPC(Go) 서버와 동일한 머신의 세션.',
+      '아이콘을 두 번 클릭하세요. 터미널: 실제 셸; 파일 탐색: Linux 파일 시스템(C 프로세스와 동일 권한).',
+    'desktop.shell.banner': '호스트 PTY — HostPC(C) 서버와 동일한 머신의 세션.',
     'desktop.shell.connectFail': '[호스트] WebSocket /ws/shell 연결 실패.',
     'desktop.shell.disconnected': '[호스트] 셸 세션이 종료되었습니다(끊김 또는 프로세스 종료).',
     'desktop.shell.devHint':
-      '개발: OmniOS/backend에서 go run . -static ../frontend/dist 로 8080 실행 후 OmniOS/frontend에서 pnpm dev — Vite가 /ws를 8080으로 프록시합니다.',
+      '개발: OmniOS/backend에서 make run 으로 8080 실행 후 OmniOS/frontend에서 pnpm dev — Vite가 /ws를 8080으로 프록시합니다.',
     'desktop.aboutTitle': 'OmniRoam 호스트 UI',
     'desktop.aboutBody1':
       '이 탭은 가벼운 그래픽 셸입니다. 드래그 가능한 창, 작업 표시줄, 콘솔 일부를 반영한 작은 도구를 제공합니다.',
@@ -620,7 +620,7 @@ const M: Record<Locale, Record<string, string>> = {
     'fs.unauthorized': '세션이 만료되었습니다. 다시 로그인하세요.',
     'fs.truncated': '항목이 너무 많아 목록이 잘렸습니다.',
     'fs.hint':
-      '폴더 행을 한 번 클릭하면 들어갑니다. HostPC Go 프로세스 사용자 권한과 동일하며 일부 경로는 거부될 수 있습니다.',
+      '폴더 행을 한 번 클릭하면 들어갑니다. HostPC C 프로세스 사용자 권한과 동일하며 일부 경로는 거부될 수 있습니다.',
     'update.title': '소프트웨어 업데이트',
     'update.available': '로컬 Git 체크아웃이 원격보다 뒤처져 있습니다. 변경 로그를 확인한 뒤 업데이트를 진행하세요.',
     'update.shas': '로컬 {{local}} · 원격 {{remote}} ({{branch}})',
@@ -634,7 +634,7 @@ const M: Record<Locale, Record<string, string>> = {
     'update.later': '나중에',
     'update.countdownTitle': '재확인',
     'update.countdownBody':
-      'git pull 후 웹 UI·Go 바이너리를 다시 빌드하고 서비스를 재설치합니다(잠시 중단될 수 있음).',
+      'git pull 후 웹 UI·C 바이너리를 다시 빌드하고 서비스를 재설치합니다(잠시 중단될 수 있음).',
     'update.countdownWait': '{{n}}초 대기 — 카운트다운이 끝나야 확인 버튼이 활성화됩니다.',
     'update.sureQuestion': '정말 업데이트하시겠습니까?',
     'update.startDeploy': '업데이트 확인',

@@ -10,7 +10,7 @@
 #   OMNIROAM_ROSLAUNCH_ARGS    传给 roslaunch 的额外参数
 #   HOSTPC_GITHUB_REPO         传给后端的 -github-repo
 #   OMNIROAM_GITHUB_BRANCH     默认 main
-#   OMNIROAM_HOSTPC_EXTRA_ARGS 追加到 go run 的参数
+#   OMNIROAM_HOSTPC_EXTRA_ARGS 追加到 C 后端 hostpc-c 的参数
 #
 set -euo pipefail
 
@@ -28,19 +28,19 @@ log() { echo "[omniroam] $*"; }
 
 resolve_layout() {
   FRONTEND_DIR=""; BACKEND_DIR=""; CATKIN_WS=""; DEPLOY_DIR=""; PANEL_ROOT=""
-  if [[ -f "$ROOT/software/backend/main.go" ]]; then
+  if [[ -f "$ROOT/software/backend/Makefile" ]]; then
     PANEL_ROOT="$ROOT/software"
     FRONTEND_DIR="$PANEL_ROOT/frontend"
     BACKEND_DIR="$PANEL_ROOT/backend"
     CATKIN_WS="$PANEL_ROOT/ros/catkin_ws"
     DEPLOY_DIR="$PANEL_ROOT/deploy"
-  elif [[ -f "$ROOT/OmniControlPanel/backend/main.go" ]]; then
+  elif [[ -f "$ROOT/OmniControlPanel/backend/Makefile" ]]; then
     PANEL_ROOT="$ROOT/OmniControlPanel"
     FRONTEND_DIR="$PANEL_ROOT/frontend"
     BACKEND_DIR="$PANEL_ROOT/backend"
     CATKIN_WS="$PANEL_ROOT/ros/catkin_ws"
     DEPLOY_DIR="$PANEL_ROOT/deploy"
-  elif [[ -f "$ROOT/OmniOS/backend/main.go" ]]; then
+  elif [[ -f "$ROOT/OmniOS/backend/Makefile" ]]; then
     PANEL_ROOT="$ROOT/OmniOS"
     FRONTEND_DIR="$PANEL_ROOT/frontend"
     BACKEND_DIR="$PANEL_ROOT/backend"
@@ -71,22 +71,25 @@ check_environment() {
   echo "  ┌─────────────────────────────────────────────────────────┐"
   echo "  │  环境检测                                                │"
   echo "  └─────────────────────────────────────────────────────────┘"
-  if ! command -v go >/dev/null 2>&1; then
-    echo "  · 缺少: go（后端无法编译运行）"
+  if ! command -v gcc >/dev/null 2>&1; then
+    echo "  · 缺少: gcc（C 后端无法编译运行）"
     issues=1
   else
-    echo "  · Go:   $(command -v go) ($("go" version 2>/dev/null | head -1))"
+    echo "  · GCC:  $(command -v gcc) ($(gcc --version 2>/dev/null | head -1))"
     if [[ -n "${BACKEND_DIR:-}" ]] && [[ -d "$BACKEND_DIR" ]]; then
-      if [[ ! -f "$BACKEND_DIR/go.mod" ]]; then
-        echo "  · 缺少: $BACKEND_DIR/go.mod（Go Modules 下 go run 会报错；请拉全仓库含 software/backend/go.mod、go.sum）"
-        issues=1
-      elif [[ ! -f "$BACKEND_DIR/go.sum" ]]; then
-        echo "  · 缺少: $BACKEND_DIR/go.sum（依赖校验不完整；请在 software/backend 执行 go mod tidy）"
+      if [[ ! -f "$BACKEND_DIR/Makefile" ]]; then
+        echo "  · 缺少: $BACKEND_DIR/Makefile（C 后端无法 make）"
         issues=1
       else
-        echo "  · Go 模块: go.mod / go.sum 已存在"
+        echo "  · C 后端: Makefile 已存在"
       fi
     fi
+  fi
+  if command -v make >/dev/null 2>&1; then
+    echo "  · make: $(command -v make)"
+  else
+    echo "  · 缺少: make（C 后端无法编译）"
+    issues=1
   fi
   if command -v pnpm >/dev/null 2>&1; then
     echo "  · pnpm: $(command -v pnpm) ($("pnpm" --version 2>/dev/null || true))"
@@ -160,7 +163,7 @@ draw_menu() {
   ├──────────────────────────────────────────────────────────────┤
   │  1) 检查更新（git fetch，显示与远端差异）                     │
   │  2) 应用更新（git pull + 构建；生产环境会跑 install-hostpc）  │
-  │  3) 重启 HostPC（后端 go run；按需重启 Vite）                 │
+  │  3) 重启 HostPC（C 后端；按需重启 Vite）                      │
   │  4) 停止本脚本管理的全部服务（后端 / Vite / roslaunch）       │
   │  5) 启动 roscore（需已安装 ROS Noetic）                       │
   │  6) 停止 roscore / 本仓库记录的 roslaunch                     │
@@ -276,33 +279,30 @@ start_hostpc_backend() {
     log "hostpc 已在运行 (pid $(cat "$STATEDIR/hostpc.pid"))"
     return 0
   fi
-  if ! command -v go >/dev/null 2>&1; then
-    log "ERROR: 未安装 go，无法启动后端"
+  if ! command -v gcc >/dev/null 2>&1; then
+    log "ERROR: 未安装 gcc，无法编译 C 后端"
     return 1
   fi
-  if [[ ! -f "$BACKEND_DIR/go.mod" ]]; then
-    log "ERROR: 缺少 $BACKEND_DIR/go.mod — 无法 go run。请从仓库拉取完整 software/backend（含 go.mod、go.sum），或在该目录执行 go mod init / go mod tidy（见 software/backend/README.md）。"
+  if ! command -v make >/dev/null 2>&1; then
+    log "ERROR: 未安装 make，无法编译 C 后端"
     return 1
   fi
-  if [[ ! -f "$BACKEND_DIR/go.sum" ]]; then
-    log "ERROR: 缺少 $BACKEND_DIR/go.sum — 请在 software/backend 执行: go mod tidy"
+  if [[ ! -f "$BACKEND_DIR/Makefile" ]]; then
+    log "ERROR: 缺少 $BACKEND_DIR/Makefile — 无法构建 C 后端"
     return 1
   fi
   ensure_frontend_dist || true
   mkdir -p "$ROOT"
-  local SETTINGS SECRET SQLITE STATIC_DIST GH_REPO GH_BRANCH EXTRA
+  local SETTINGS USERS STATIC_DIST EXTRA
   SETTINGS="$ROOT/hostpc-settings.json"
-  SQLITE="$ROOT/hostpc-users.db"
-  SECRET="$ROOT/hostpc-auth-secret"
+  USERS="$ROOT/hostpc-users.cauth"
   STATIC_DIST="$(cd "$FRONTEND_DIR" && pwd)/dist"
-  GH_REPO="${HOSTPC_GITHUB_REPO:-${OMNIROAM_GITHUB_SLUG:-}}"
-  GH_BRANCH="${OMNIROAM_GITHUB_BRANCH:-main}"
   EXTRA="${OMNIROAM_HOSTPC_EXTRA_ARGS:-}"
-  local RUN=(go run . -addr 0.0.0.0:8080 -static "$STATIC_DIST" -repo-root "$ROOT" -settings "$SETTINGS" -sqlite-users "$SQLITE" -auth-secret "$SECRET")
-  [[ -n "$GH_REPO" ]] && RUN+=(-github-repo "$GH_REPO" -github-branch "$GH_BRANCH")
+  (cd "$BACKEND_DIR" && make)
+  local RUN=("$BACKEND_DIR/hostpc-c" -addr 0.0.0.0:8080 -static "$STATIC_DIST" -repo-root "$ROOT" -settings "$SETTINGS" -users "$USERS")
   # shellcheck disable=SC2206
   [[ -n "$EXTRA" ]] && RUN+=($EXTRA)
-  log "启动 HostPC（go run）→ $LOGDIR/hostpc.log"
+  log "启动 HostPC（C 后端）→ $LOGDIR/hostpc.log"
   cd "$BACKEND_DIR"
   nohup "${RUN[@]}" >"$LOGDIR/hostpc.log" 2>&1 &
   echo $! >"$STATEDIR/hostpc.pid"
