@@ -1,40 +1,40 @@
-# Backend（Go 上位机服务）
+# OmniRoam HostPC C Backend
 
-HTTP 静态资源（Vue 构建产物）、WebSocket（日志、键盘、Shell、VNC 代理）、REST API（鉴权、设置、串口、文件浏览、更新检测等）。
+本目录是 C 语言版 HostPC 后端。Go 后端已经移除，运行时只使用 `hostpc-c`。
 
-本目录为 **Go Modules** 工程，**必须**包含 **`go.mod`** 与 **`go.sum`** 并纳入版本控制。仓库根 `./omniroam.sh` 使用 `go run .` 启动后端；若缺少上述文件，Go 会报错且脚本会拒绝启动。
-
-首次拉代码或依赖有变更时，在 **`software/backend`** 执行：
+## 构建与运行
 
 ```bash
-go mod tidy
+make
+./hostpc-c -addr 0.0.0.0:8080 -static ../frontend/dist
 ```
 
-若访问 `proxy.golang.org` 不稳定（例如部分网络环境），可设置镜像后再 tidy：
+或从 `software/` 目录执行：
 
 ```bash
-export GOPROXY=https://goproxy.cn,direct
-go mod tidy
+bash start-hostpc.sh
 ```
 
-## 开发运行
+## 主要功能
 
-在 **`software/backend`** 目录：
+- 托管 `frontend/dist` 静态前端，并支持 SPA fallback。
+- 提供登录、登出、会话检查和改密接口。
+- 读写 `hostpc-settings.json`。
+- 枚举 Linux 串口设备。
+- 提供只读文件列表接口。
+- 提供主 `/ws` WebSocket 日志与按键确认通道。
+- 保留更新状态接口，便于前端兼容。
+
+## 默认账号
+
+首次运行会生成 `hostpc-users.cauth`：
+
+```text
+user / 123456
+```
+
+可以用环境变量覆盖首次初始化账号：
 
 ```bash
-go mod tidy   # 首次或依赖变更时
-go run . -addr 0.0.0.0:8080 -static ../frontend/dist
+HOSTPC_USER=admin HOSTPC_PASSWORD='your-password' ./hostpc-c
 ```
-
-需先有 **`../frontend/dist`**（在 `software/frontend` 执行 `pnpm install && pnpm run build`）。
-
-## 仓库根一键启动
-
-在仓库根执行 `./omniroam.sh` 时，会进入本目录并以 `go run` 启动（静态目录为前端 `dist` 的绝对路径，并传入 `-repo-root`、SQLite 等）。启动前会检查 `go.mod` / `go.sum` 是否存在。
-
-## 数据库
-
-- **MySQL**：`MYSQL_DSN` 或 `-mysql-dsn`。
-- **SQLite（开发/LAN）**：`-sqlite-users` / `HOSTPC_SQLITE_USERS`。
-
-MySQL 容器见 `../database/`。

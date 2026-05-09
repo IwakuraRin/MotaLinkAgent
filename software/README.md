@@ -8,7 +8,7 @@ OmniRoam 在单机上的**一体软件包**：ROS、上位机前后端、可选 
 |------|------|
 | `ros/` | ROS 1（Noetic）Catkin 工作区 |
 | `frontend/` | 上位机 **Vue 3 + Vite** 前端，`pnpm build` → `dist/` |
-| `backend/` | 上位机 **Go** HTTP/WebSocket 服务，读取 `frontend/dist` |
+| `backend/` | 上位机 **C** HTTP/WebSocket 服务，读取 `frontend/dist` |
 | `deploy/` | systemd 安装、`hostpc-self-update.sh` 等生产部署脚本 |
 | `database/` | 可选：Docker Compose 启动 MySQL |
 | `systeminfo/` | 可选：桌面系统信息小工具（见该目录） |
@@ -35,7 +35,7 @@ bash software/start-hostpc.sh
 source /path/to/OmniRoam/setup_ros1.bash
 ```
 
-## MySQL（可选）
+## 数据库（可选）
 
 ```bash
 cd software/database
@@ -43,4 +43,4 @@ cp .env.example .env
 docker compose up -d
 ```
 
-在运行 `backend` 的环境中配置 `MYSQL_DSN`，详见 `database/README.md`。
+C 后端默认使用轻量账号文件 `hostpc-users.cauth`，不再依赖 Go 或 MySQL。`database/` 保留给其它实验模块按需使用。
