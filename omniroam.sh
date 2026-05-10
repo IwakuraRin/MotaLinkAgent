@@ -5,6 +5,7 @@
 #   OMNIROAM_SKIP_ROS=1        不启动 / 不检测 roscore
 #   OMNIROAM_USE_SYSTEMD=1     使用 systemctl 管理 hostpc（需已 install-hostpc）
 #   OMNIROAM_NO_VITE=1         不自动启动 Vite 开发服务器（仅用 8080 静态站）
+#   OMNIROAM_NO_CAMERA=1       不自动启动 USB 摄像头 MJPEG 服务
 #   OMNIROAM_MENU=0            启动服务后退出，不进入交互菜单（供脚本调用）
 #   OMNIROAM_ROSLAUNCH         roslaunch，格式: "pkg file.launch"
 #   OMNIROAM_ROSLAUNCH_ARGS    传给 roslaunch 的额外参数
@@ -325,6 +326,31 @@ start_hostpc_backend() {
   return 1
 }
 
+
+start_usb_camera_web() {
+  if [[ "${OMNIROAM_NO_CAMERA:-0}" == "1" ]]; then
+    return 0
+  fi
+  if [[ ! -f /opt/ros/noetic/setup.bash ]] || [[ ! -f "$CATKIN_WS/devel/setup.bash" ]]; then
+    return 0
+  fi
+  if [[ ! -e /dev/video0 ]]; then
+    log "未检测到 /dev/video0，跳过 USB 摄像头流"
+    return 0
+  fi
+  if [[ -f "$STATEDIR/usb_camera_web.pid" ]] && kill -0 "$(cat "$STATEDIR/usb_camera_web.pid")" 2>/dev/null; then
+    log "USB 摄像头流已在运行 (pid $(cat "$STATEDIR/usb_camera_web.pid"))"
+    return 0
+  fi
+  if ss -ltn 2>/dev/null | grep -q ':8081 '; then
+    log "8081 已被占用，跳过 USB 摄像头流启动"
+    return 0
+  fi
+  log "启动 USB 摄像头 MJPEG 服务 → $LOGDIR/usb_camera_web.log"
+  bash -lc "source /opt/ros/noetic/setup.bash && source '$CATKIN_WS/devel/setup.bash' && exec roslaunch simple_robotic_arm usb_camera_web.launch video_device:=/dev/video0 web_video_port:=8081" >"$LOGDIR/usb_camera_web.log" 2>&1 &
+  echo $! >"$STATEDIR/usb_camera_web.pid"
+}
+
 start_vite_if_enabled() {
   if [[ "${OMNIROAM_NO_VITE:-0}" == "1" ]]; then
     return 0
@@ -483,6 +509,7 @@ resolve_layout
 mkdir -p "$STATEDIR" "$LOGDIR"
 check_environment
 start_ros_layer
+start_usb_camera_web || true
 if ! start_hostpc_backend; then
   log "后端启动未完全成功，仍可进入菜单排查。"
 fi

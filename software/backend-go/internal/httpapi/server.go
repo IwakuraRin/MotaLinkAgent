@@ -1,4 +1,4 @@
-// 作用：实现 HostPC Go API 路由、JSON 响应、静态前端托管和 WebSocket 占位通道。
+// 作用：实现 HostPC Go API 路由、JSON 响应、静态前端托管和 WebSocket 通道。
 package httpapi
 
 import (
@@ -6,11 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/creack/pty"
+	"github.com/gorilla/websocket"
 
 	"omniroam/hostpc-api/internal/auth"
 	"omniroam/hostpc-api/internal/config"
@@ -49,8 +54,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/updates/status", s.handleUpdatesStatus)
 	s.mux.HandleFunc("/api/updates/apply", s.handleUpdatesApply)
 	s.mux.HandleFunc("/ws", s.handleMainWebSocket)
-	s.mux.HandleFunc("/ws/shell", s.handleNotImplementedWebSocket)
-	s.mux.HandleFunc("/ws/vnc", s.handleNotImplementedWebSocket)
+	s.mux.HandleFunc("/ws/shell", s.handleShellWebSocket)
+	s.mux.HandleFunc("/ws/vnc", s.handleVNCWebSocket)
 	s.mux.HandleFunc("/", s.handleStatic)
 }
 
@@ -234,15 +239,135 @@ func (s *Server) handleUpdatesApply(w http.ResponseWriter, r *http.Request) {
 	jsonError(w, http.StatusBadRequest, "no update available")
 }
 
-// ==================== WebSocket 占位接口 ====================
-// 作用：保留路径，主通道返回 501，后续接 C 控制核心事件流。
-// ==========================================================
+// ==================== WebSocket 接口 ====================
+// 作用：提供主日志通道、真实 Host PTY 和 noVNC TCP 转发。
+// ======================================================
 func (s *Server) handleMainWebSocket(w http.ResponseWriter, r *http.Request) {
-	jsonError(w, http.StatusNotImplemented, "websocket bridge is not connected yet")
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	_ = conn.WriteJSON(map[string]any{"type": "log", "line": "INFO  Go HostPC WebSocket connected", "edge": "e_ws"})
+	for {
+		var msg map[string]any
+		if err := conn.ReadJSON(&msg); err != nil {
+			return
+		}
+		if msg["type"] == "key" {
+			_ = conn.WriteJSON(map[string]any{"type": "ack", "msg": "key command received by Go API", "edge": "e_ws"})
+		}
+	}
 }
 
-func (s *Server) handleNotImplementedWebSocket(w http.ResponseWriter, r *http.Request) {
-	jsonError(w, http.StatusNotImplemented, "websocket endpoint is not implemented in Go API layer")
+func (s *Server) handleShellWebSocket(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+	cmd := exec.Command(shell, "-l")
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	tty, err := pty.Start(cmd)
+	if err != nil {
+		_ = conn.WriteMessage(websocket.BinaryMessage, []byte("\r\n[host] failed to start shell\r\n"))
+		return
+	}
+	defer tty.Close()
+	defer cmd.Process.Kill()
+	defer cmd.Wait()
+
+	_ = conn.WriteMessage(websocket.BinaryMessage, []byte("\r\n[host] Go shell connected\r\n"))
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		buf := make([]byte, 8192)
+		for {
+			n, err := tty.Read(buf)
+			if err != nil {
+				return
+			}
+			if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				return
+			}
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		msgType, payload, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		if msgType == websocket.BinaryMessage || msgType == websocket.TextMessage {
+			if _, err := tty.Write(payload); err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (s *Server) handleVNCWebSocket(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+	conn, err := wsUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	tcp, err := net.Dial("tcp", "127.0.0.1:5900")
+	if err != nil {
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"vnc target 127.0.0.1:5900 unavailable"}`))
+		return
+	}
+	defer tcp.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		buf := make([]byte, 32768)
+		for {
+			n, err := tcp.Read(buf)
+			if err != nil {
+				return
+			}
+			if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				return
+			}
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		msgType, payload, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		if msgType == websocket.BinaryMessage || msgType == websocket.TextMessage {
+			if _, err := tcp.Write(payload); err != nil {
+				return
+			}
+		}
+	}
 }
 
 // ==================== 静态前端 ====================
@@ -302,6 +427,12 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func jsonError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"error": message})
+}
+
+var wsUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 func ListenAndServe(cfg config.Config, handler http.Handler) error {
