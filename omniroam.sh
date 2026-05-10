@@ -6,6 +6,7 @@
 #   OMNIROAM_USE_SYSTEMD=1     使用 systemctl 管理 hostpc（需已 install-hostpc）
 #   OMNIROAM_NO_VITE=1         不自动启动 Vite 开发服务器（仅用 8080 静态站）
 #   OMNIROAM_NO_CAMERA=1       不自动启动 USB 摄像头 MJPEG 服务
+#   OMNIROAM_NO_YOLO=1         不自动启动 YOLO 带框调试画面
 #   OMNIROAM_MENU=0            启动服务后退出，不进入交互菜单（供脚本调用）
 #   OMNIROAM_ROSLAUNCH         roslaunch，格式: "pkg file.launch"
 #   OMNIROAM_ROSLAUNCH_ARGS    传给 roslaunch 的额外参数
@@ -206,6 +207,20 @@ stop_vite() {
   fi
 }
 
+stop_yolo_obstacle_detector() {
+  if [[ -f "$STATEDIR/yolo_obstacle_detector.pid" ]]; then
+    local pid
+    pid="$(cat "$STATEDIR/yolo_obstacle_detector.pid" 2>/dev/null || true)"
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      log "停止 YOLO 障碍物检测 (pid $pid)"
+      kill "$pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    rm -f "$STATEDIR/yolo_obstacle_detector.pid"
+  fi
+}
+
 stop_roslaunch_only() {
   if [[ -f "$STATEDIR/roslaunch.pid" ]]; then
     local pid
@@ -351,6 +366,22 @@ start_usb_camera_web() {
   echo $! >"$STATEDIR/usb_camera_web.pid"
 }
 
+start_yolo_obstacle_detector() {
+  if [[ "${OMNIROAM_NO_YOLO:-0}" == "1" ]] || [[ "${OMNIROAM_NO_CAMERA:-0}" == "1" ]]; then
+    return 0
+  fi
+  if [[ ! -f /opt/ros/noetic/setup.bash ]] || [[ ! -f "$CATKIN_WS/devel/setup.bash" ]]; then
+    return 0
+  fi
+  if [[ -f "$STATEDIR/yolo_obstacle_detector.pid" ]] && kill -0 "$(cat "$STATEDIR/yolo_obstacle_detector.pid")" 2>/dev/null; then
+    log "YOLO 障碍物检测已在运行 (pid $(cat "$STATEDIR/yolo_obstacle_detector.pid"))"
+    return 0
+  fi
+  log "启动 YOLO 带框调试画面 -> $LOGDIR/yolo_obstacle_detector.log"
+  bash -lc "source /opt/ros/noetic/setup.bash && source '$CATKIN_WS/devel/setup.bash' && exec roslaunch simple_robotic_arm yolo_obstacle_detector.launch image_topic:=/usb_cam/image_raw debug_image_topic:=/obstacle_detector/debug" >"$LOGDIR/yolo_obstacle_detector.log" 2>&1 &
+  echo $! >"$STATEDIR/yolo_obstacle_detector.pid"
+}
+
 start_vite_if_enabled() {
   if [[ "${OMNIROAM_NO_VITE:-0}" == "1" ]]; then
     return 0
@@ -419,6 +450,7 @@ cmd_restart_hostpc() {
 cmd_stop_all_managed() {
   stop_vite
   stop_hostpc_dev
+  stop_yolo_obstacle_detector
   stop_roslaunch_only
   if systemctl is-active omniroam-hostpc.service &>/dev/null; then
     log "停止 systemd omniroam-hostpc"
@@ -510,6 +542,7 @@ mkdir -p "$STATEDIR" "$LOGDIR"
 check_environment
 start_ros_layer
 start_usb_camera_web || true
+start_yolo_obstacle_detector || true
 if ! start_hostpc_backend; then
   log "后端启动未完全成功，仍可进入菜单排查。"
 fi
