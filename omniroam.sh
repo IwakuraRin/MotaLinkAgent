@@ -10,7 +10,7 @@
 #   OMNIROAM_ROSLAUNCH_ARGS    传给 roslaunch 的额外参数
 #   HOSTPC_GITHUB_REPO         传给后端的 -github-repo
 #   OMNIROAM_GITHUB_BRANCH     默认 main
-#   OMNIROAM_HOSTPC_EXTRA_ARGS 追加到 C 后端 hostpc-c 的参数
+#   OMNIROAM_HOSTPC_EXTRA_ARGS 追加到 Go API 层 hostpc-api 的参数
 #
 set -euo pipefail
 
@@ -163,7 +163,7 @@ draw_menu() {
   ├──────────────────────────────────────────────────────────────┤
   │  1) 检查更新（git fetch，显示与远端差异）                     │
   │  2) 应用更新（git pull + 构建；生产环境会跑 install-hostpc）  │
-  │  3) 重启 HostPC（C 后端；按需重启 Vite）                      │
+  │  3) 重启 HostPC（Go API；按需重启 Vite）                       │
   │  4) 停止本脚本管理的全部服务（后端 / Vite / roslaunch）       │
   │  5) 启动 roscore（需已安装 ROS Noetic）                       │
   │  6) 停止 roscore / 本仓库记录的 roslaunch                     │
@@ -279,31 +279,38 @@ start_hostpc_backend() {
     log "hostpc 已在运行 (pid $(cat "$STATEDIR/hostpc.pid"))"
     return 0
   fi
-  if ! command -v gcc >/dev/null 2>&1; then
-    log "ERROR: 未安装 gcc，无法编译 C 后端"
+  if ! command -v make >/dev/null 2>&1; then
+    log "ERROR: 未安装 make，无法编译 HostPC"
     return 1
   fi
-  if ! command -v make >/dev/null 2>&1; then
-    log "ERROR: 未安装 make，无法编译 C 后端"
+  if ! command -v go >/dev/null 2>&1; then
+    log "ERROR: 未安装 go，无法编译 Go API 层"
     return 1
   fi
   if [[ ! -f "$BACKEND_DIR/Makefile" ]]; then
-    log "ERROR: 缺少 $BACKEND_DIR/Makefile — 无法构建 C 后端"
+    log "ERROR: 缺少 $BACKEND_DIR/Makefile — 无法构建 C 控制核心"
+    return 1
+  fi
+  local GO_BACKEND_DIR="$PANEL_ROOT/backend-go"
+  if [[ ! -f "$GO_BACKEND_DIR/Makefile" ]]; then
+    log "ERROR: 缺少 $GO_BACKEND_DIR/Makefile — 无法构建 Go API 层"
     return 1
   fi
   ensure_frontend_dist || true
   mkdir -p "$ROOT"
-  local SETTINGS USERS STATIC_DIST EXTRA
+  local SETTINGS USERS STATIC_DIST EXTRA CONTROL_CORE
   SETTINGS="$ROOT/hostpc-settings.json"
   USERS="$ROOT/hostpc-users.cauth"
   STATIC_DIST="$(cd "$FRONTEND_DIR" && pwd)/dist"
+  CONTROL_CORE="$BACKEND_DIR/hostpc-c"
   EXTRA="${OMNIROAM_HOSTPC_EXTRA_ARGS:-}"
   (cd "$BACKEND_DIR" && make)
-  local RUN=("$BACKEND_DIR/hostpc-c" -addr 0.0.0.0:8080 -static "$STATIC_DIST" -repo-root "$ROOT" -settings "$SETTINGS" -users "$USERS")
+  (cd "$GO_BACKEND_DIR" && make)
+  local RUN=("$GO_BACKEND_DIR/hostpc-api" -addr 0.0.0.0:8080 -static "$STATIC_DIST" -settings "$SETTINGS" -users "$USERS" -control-core "$CONTROL_CORE")
   # shellcheck disable=SC2206
   [[ -n "$EXTRA" ]] && RUN+=($EXTRA)
-  log "启动 HostPC（C 后端）→ $LOGDIR/hostpc.log"
-  cd "$BACKEND_DIR"
+  log "启动 HostPC（Go API + C 控制核心）→ $LOGDIR/hostpc.log"
+  cd "$GO_BACKEND_DIR"
   nohup "${RUN[@]}" >"$LOGDIR/hostpc.log" 2>&1 &
   echo $! >"$STATEDIR/hostpc.pid"
   log "hostpc pid $(cat "$STATEDIR/hostpc.pid")"
@@ -368,7 +375,8 @@ cmd_apply_update() {
     log "未找到 hostpc-self-update.sh，执行简易: pull + build"
     git -C "$ROOT" pull --ff-only || return 1
     (cd "$FRONTEND_DIR" && pnpm install && pnpm run build)
-    (cd "$BACKEND_DIR" && go build -o hostpc .)
+    (cd "$BACKEND_DIR" && make)
+    (cd "$PANEL_ROOT/backend-go" && make)
   fi
 }
 
