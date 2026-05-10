@@ -1,5 +1,5 @@
 [Unit]
-Description=OmniRoam HostPC (Go HTTP/WebSocket + static Vue UI)
+Description=OmniRoam HostPC (Go API + C Control Core + Vue UI)
 After=network-online.target
 Wants=network-online.target
 
@@ -9,20 +9,16 @@ User=omniroam
 Group=omniroam
 WorkingDirectory=/var/lib/omniroam
 
-# SQLite 用户库（默认）。若改用 MySQL：删除下行里的 -sqlite-users …，并取消注释 EnvironmentFile，在 /etc/omniroam/hostpc.env 写 MYSQL_DSN=...
-# 远程桌面 noVNC：默认把 /ws/vnc 转到本机 127.0.0.1:5900；若 VNC 在别的端口可设 Environment=HOSTPC_VNC_ADDR=127.0.0.1:5901
-ExecStart=/usr/sbin/hostpc \
+# 作用：Go 负责 HTTP/API/静态资源，C 控制核心由 -control-core 指向，后续可通过进程或本地 socket 接入。
+ExecStart=/usr/sbin/hostpc-api \
   -addr 0.0.0.0:8080 \
   -static /usr/share/omniroam/web/dist \
-  -sqlite-users /var/lib/omniroam/hostpc-users.db \
   -settings /var/lib/omniroam/hostpc-settings.json \
-  -auth-secret /var/lib/omniroam/hostpc-auth-secret
-
-# EnvironmentFile=-/etc/omniroam/hostpc.env
+  -users /var/lib/omniroam/hostpc-users.cauth \
+  -control-core /usr/lib/omniroam/hostpc-c
 
 Restart=on-failure
 RestartSec=3
-# 文件管理器能列出的目录权限 = 此用户；需要更广可读时可改为补组或 ACL
 UMask=0027
 
 [Install]
