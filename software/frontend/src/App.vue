@@ -259,7 +259,7 @@ const autoCamera = (() => {
   if (typeof window === 'undefined') return ''
   const host = window.location.hostname
   if (!host) return ''
-  return `http://${host}:8081/stream?topic=/obstacle_detector/debug`
+  return `http://${host}:8081/stream?topic=/usb_cam/image_raw`
 })()
 const cameraSrc = computed(() => {
   const u = appliedCameraUrl.value.trim()
@@ -655,13 +655,13 @@ async function hydrateAppliedCameraUrl() {
   }
 
   const lsCam = localStorage.getItem(LS_CAMERA)
-  const isRawCameraUrl = (url: string) => url.includes('/usb_cam/image_raw')
-  if (lsCam !== null && !isRawCameraUrl(lsCam)) {
+  const isStaleDebugCameraUrl = (url: string) => url.includes('/obstacle_detector/debug')
+  if (lsCam !== null && !isStaleDebugCameraUrl(lsCam)) {
     appliedCameraUrl.value = lsCam
   } else {
     const j = await getServer()
     const serverCameraUrl = j && typeof j.camera_url === 'string' ? j.camera_url : ''
-    appliedCameraUrl.value = serverCameraUrl && !isRawCameraUrl(serverCameraUrl) ? serverCameraUrl : envCamera || autoCamera
+    appliedCameraUrl.value = serverCameraUrl || envCamera || autoCamera
   }
 }
 
