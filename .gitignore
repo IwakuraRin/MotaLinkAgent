@@ -81,3 +81,13 @@ software/backend/hostpc-settings.json
 # HostPC root runtime settings
 hostpc-users.cauth
 hostpc-settings.json
+# macOS metadata
+.DS_Store
+._*
+__MACOSX/
+
+# HostPC Go API build output
+software/backend-go/hostpc-api
+# Runtime logs written at repository root
+yolo_obstacle_detector.log
+yolo_obstacle_detector.pid
