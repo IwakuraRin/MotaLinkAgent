@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<!--
+  三全向轮底盘运动学启动文件：
+  启动 chassis_kinematics.py，把 /cmd_vel 转换为三颗 85mm 全向轮目标角速度。
+  几何参数来自 2026-05-10 Shapr3D STEP 底盘文件。
+-->
+<launch>
+  <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="wheel_omega_topic" default="/chassis/wheel_omega"/>
+  <arg name="serial_tx_topic" default="/esp32_serial_bridge/tx"/>
+  <arg name="publish_serial" default="true"/>
+
+  <arg name="wheel_base_radius_m" default="0.1337147"/>
+  <arg name="wheel_radius_m" default="0.0425"/>
+  <arg name="wheel_omega_max_rad_s" default="25.10"/>
+  <arg name="control_rate_hz" default="30.0"/>
+  <arg name="command_timeout_s" default="0.35"/>
+  <arg name="twist_filter_tau_s" default="0.08"/>
+
+  <node
+    pkg="simple_robotic_arm"
+    type="chassis_kinematics.py"
+    name="chassis_kinematics"
+    output="screen"
+  >
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+    <param name="wheel_omega_topic" value="$(arg wheel_omega_topic)"/>
+    <param name="serial_tx_topic" value="$(arg serial_tx_topic)"/>
+    <param name="publish_serial" value="$(arg publish_serial)"/>
+
+    <param name="wheel_base_radius_m" value="$(arg wheel_base_radius_m)"/>
+    <param name="wheel_radius_m" value="$(arg wheel_radius_m)"/>
+    <param name="wheel_omega_max_rad_s" value="$(arg wheel_omega_max_rad_s)"/>
+    <param name="control_rate_hz" value="$(arg control_rate_hz)"/>
+    <param name="command_timeout_s" value="$(arg command_timeout_s)"/>
+    <param name="twist_filter_tau_s" value="$(arg twist_filter_tau_s)"/>
+
+    <rosparam param="wheel_angles_deg">[29.9459, 149.6229, -90.8207]</rosparam>
+    <rosparam param="wheel_signs">[1.0, 1.0, 1.0]</rosparam>
+  </node>
+</launch>

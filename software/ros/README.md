@@ -66,3 +66,40 @@ rostopic echo /obstacle_test_cmd_vel
 ```
 
 这是单目启发式避障，不能得到真实距离；实际运行前需要按现场地面、光照、摄像头角度调 `center_stop_ratio`、`roi_y0/roi_y1`、`hsv_floor_dist_thresh` 等参数。需要可靠距离时应接入深度相机、双目或激光雷达。
+
+## 三全向轮底盘运动学
+
+`chassis_kinematics.py` 使用 Shapr3D STEP 底盘文件实测参数，把 `/cmd_vel` 转换为三颗 85mm 全向轮目标角速度。
+
+当前 CAD 参数：
+
+```text
+轮心距：231.597 mm
+车体中心到轮心半径：133.715 mm
+轮半径：42.5 mm
+三轮方位角：29.9459°, 149.6229°, -90.8207°
+```
+
+启动运动学节点：
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/orbot_admin/orbot/software/ros/catkin_ws/devel/setup.bash
+roslaunch simple_robotic_arm chassis_kinematics.launch
+```
+
+调试时不发串口，只看计算结果：
+
+```bash
+roslaunch simple_robotic_arm chassis_kinematics.launch publish_serial:=false
+rostopic pub -r 10 /cmd_vel geometry_msgs/Twist "{linear: {x: 0.25, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+rostopic echo /chassis/wheel_omega
+```
+
+默认会向 `/esp32_serial_bridge/tx` 发送文本协议：
+
+```text
+CHASSIS_WHEEL_OMEGA <right_front_rad_s> <left_front_rad_s> <rear_rad_s>
+```
+
+如果实车某个电机方向反了，先不要改公式，启动时调整 `wheel_signs` 参数即可。
