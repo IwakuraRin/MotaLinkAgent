@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+/* PVE-like sharp panels */
+@layer components {
+  .pve-panel-title {
+    @apply px-2 py-1 text-xs font-semibold uppercase tracking-wide text-pve-text border-b border-pve-border bg-pve-header;
+  }
+  .pve-kbd {
+    @apply inline-flex min-w-[1.75rem] justify-center rounded-sm border border-pve-border bg-pve-panel px-1.5 py-0.5 font-mono text-xs text-pve-text shadow-inner;
+  }
+}
