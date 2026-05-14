@@ -1,280 +1,46 @@
-# OmniRoam
+# software（一体软件包）
 
-## Tri-omni mobile manipulator · 三轮全向轮移动机械臂平台
+OmniRoam 在单机上的**一体软件包**：ROS、上位机前后端、可选 MySQL、桌面小工具与部署脚本，按目录拆分，互不揉在一起。仓库内路径为 **`software/`**（原 `OmniControlPanel/` 已迁入此处）。
 
-**OmniRoam** is a development platform built around a **three-wheeled omnidirectional (holonomic) chassis** and an **onboard robotic arm**. It supports **omnidirectional translation and yaw** on the plane (subject to wheel layout and control), **arm pick-and-place** with a small cargo bay, **tele-operation**, and higher-level **autonomy** where sensors and software allow. An **x86 Linux host** runs **ROS 1**; an **ESP32-S3** drives actuators via **I2C** to the motor driver board and exchanges data with the host over **USB–UART**.
+## 目录结构
 
-**OmniRoam** 是一套围绕**三轮全向（全驱）底盘**与**车载机械臂**搭建的实验平台：支持平面**全向平移与旋转**（取决于轮系布局与控制）、**机械臂抓取**与小**货舱**作业、**遥控**，以及在有传感器与软件时的更高层**自主运行**。**x86 Linux 上位机**运行 **ROS 1**；**ESP32-S3** 经 **I2C** 连接电机控制板驱动执行机构，并经 **USB–UART** 与上位机交换数据。
+| 目录 | 说明 |
+|------|------|
+| `ros/` | ROS 1（Noetic）Catkin 工作区 |
+| `frontend/` | 上位机 **Vue 3 + Vite** 前端，`pnpm build` → `dist/` |
+| `backend/` | 上位机 **C** HTTP/WebSocket 服务，读取 `frontend/dist` |
+| `deploy/` | systemd 安装、`hostpc-self-update.sh` 等生产部署脚本 |
+| `database/` | 可选：Docker Compose 启动 MySQL |
+| `systeminfo/` | 可选：桌面系统信息小工具（见该目录） |
 
-<a id="repo-tree"></a>
+## 推荐启动方式
 
-## 仓库目录结构
-
-```
-OmniRoam/
-├── omniroam.sh                     # 统一控制台：ROS + 前后端 + 菜单
-├── setup_ros1.bash                 # 包装 → scripts/setup_ros1.bash
-├── setup_hostpc_ubuntu20.sh        # 包装 → scripts/setup_hostpc_ubuntu20.sh
-├── scripts/                        # 环境与 ROS 加载脚本（实际逻辑）
-│   ├── setup_ros1.bash
-│   └── setup_hostpc_ubuntu20.sh
-├── software/                       # 上位机一体软件（前后端、ROS、部署、数据库）
-│   ├── README.md
-│   ├── start-hostpc.sh             # 构建前端 + go run 后端
-│   ├── frontend/                   # Vue 3 + Vite + Tailwind（pnpm）
-│   ├── backend/                    # Go HTTP / WebSocket 服务
-│   ├── database/                   # 可选 MySQL（Docker Compose）
-│   ├── deploy/                     # systemd、install-hostpc、自更新脚本
-│   ├── ros/                        # ROS 1 Catkin 工作区
-│   │   └── catkin_ws/
-│   └── systeminfo/                 # 可选桌面小工具
-├── hardware/                       # 机械 / 制造相关资源
-│   └── 3mf_print/                  # 3D 打印 .3mf（若仍存在根目录 3mf_printFile，可用 sudo 删除后仅以本目录为准）
-├── LICENSE
-├── README.md
-└── CHANGELOG.md
-```
-
-未列出：`.git`、`software/ros/catkin_ws/build`、`software/frontend/node_modules`、`.omniroam/` 等生成或依赖目录。
-
----
-
-**Language / 语言:** [目录结构 ↑](#repo-tree) · [English ↓](#lang-en) · [简体中文 ↓](#lang-zh)
-
----
-
-<a id="lang-en"></a>
-
-## Documentation (English)
-
-Quick links: [Tree](#repo-tree) · [Overview](#en-overview) · [Architecture](#en-architecture) · [Repository](#en-repo) · [Build & run](#en-dev) · [Status](#en-status) · [简体中文 →](#lang-zh)
-
-<a id="en-overview"></a>
-
-### Overview
-
-**OmniRoam** is an experimental **tri-omni mobile manipulator** platform: tele-operation, basic autonomy, arm pick-and-place with a small cargo bay; split **host PC (x86 Linux, ROS 1) + ESP32-S3**; open firmware and ROS-side code for learning and small demos.
-
-| Area | Description |
-|------|-------------|
-| Chassis | **Tri-omni** base: planar translation and yaw (depends on wheel layout & control allocation) |
-| Arm | Onboard manipulator picks small objects and places them in the cargo bay |
-| Mobility | Omnidirectional driving, line/route following, etc. (depends on sensors & stack) |
-| Tele-op | Remote chassis and arm commands |
-
-**Design note:** computing vs. real-time control are separated; chassis and lightweight manipulation share one hardware platform.
-
-<a id="en-architecture"></a>
-
-### System architecture
-
-#### Hardware roles
-
-| Role | Stack | Notes |
-|------|--------|------|
-| Host | x86_64 Linux, **ROS 1 Noetic** | Planning, perception, HMI; **USB camera** for web video (independent of the serial link) |
-| Link | **USB ↔ UART** (e.g. **CH340**) | **Cross TX/RX + common GND**, **full-duplex**; on Linux often `/dev/ttyUSB*`; add user to `dialout` |
-| MCU | **ESP32-S3** | Firmware typically in a PlatformIO project (e.g. `firmware/` or board repo; align UART with the bridge) |
-| Actuation | **I2C → motor driver board** | PWM, encoder motors, etc. depend on your board and firmware |
-
-#### Data flow (conceptual)
-
-```
-Web / ROS nodes (x86)
-        │  USB-UART (bidirectional)
-        ▼
-   ESP32-S3
-        │  I2C
-        ▼
-  Driver board ──► PWM / encoder motors, etc.
-
-USB camera (x86) ──► Web video (not through ESP32)
-```
-
-#### ROS & serial (current design)
-
-- Catkin workspace: `software/ros/catkin_ws/`（若仍使用仓库根旧布局则为 `catkin_ws/`）；环境：`source setup_ros1.bash`。
-- Package `simple_robotic_arm` provides a **line-oriented text** serial bridge `esp32_serial_bridge.py` (topics `~tx` / `~rx`) for quick bring-up with `Serial.print` style logs.
-- A **proper protocol** (joints, encoders, framing, checksums) must be agreed between ESP32 and this node, then implemented in code.
-
-<a id="en-repo"></a>
-
-### Repository layout
-
-| Path | Purpose |
-|------|---------|
-| `setup_ros1.bash` | Sources `/opt/ros/noetic` and this repo’s Catkin `devel`（见 `scripts/setup_ros1.bash`） |
-| `software/ros/catkin_ws/` | ROS 1 Catkin workspace; `build/` & `devel/` are usually local-only |
-| `software/ros/catkin_ws/src/simple_robotic_arm/` | ROS package（若已检出）: serial bridge、launch 等 |
-| `software/frontend/` / `software/backend/` | Host web UI: Vue + Vite, Go HTTP/WebSocket；说明见 `software/README.md` |
-| `hardware/3mf_print/` | 3D printing `.3mf` parts |
-| `setup_hostpc_ubuntu20.sh` | **Ubuntu 20.04** fresh host: ROS Noetic, Go, Node/pnpm, `catkin_make`, dialout |
-| `LICENSE` | License |
-
-<a id="en-dev"></a>
-
-### Development & run
-
-**New Ubuntu 20.04 host (Server/Desktop)**
+在 **OmniRoam 仓库根** 执行：
 
 ```bash
-cd /path/to/OmniRoam
-bash setup_hostpc_ubuntu20.sh
+./omniroam.sh
 ```
 
-**ROS (host)**
+会识别 `software/`（或旧布局 `OmniControlPanel` / `OmniOS` / `HostPC`）下的前后端，先做环境检测，再启动后端与 Vite（可用 `OMNIROAM_NO_VITE=1` 仅 8080），并进入终端菜单。
+
+仅构建并启动后端（无交互菜单）时：
+
+```bash
+bash software/start-hostpc.sh
+```
+
+加载 ROS 覆盖层：
 
 ```bash
 source /path/to/OmniRoam/setup_ros1.bash
-cd software/ros/catkin_ws && catkin_make && source devel/setup.bash
 ```
 
-**Serial bridge (CH340 / USB-UART device)**
+## 数据库（可选）
 
 ```bash
-sudo apt install python3-serial   # if needed
-roslaunch simple_robotic_arm esp32_serial_bridge.launch port:=/dev/ttyUSB0
+cd software/database
+cp .env.example .env
+docker compose up -d
 ```
 
-Example topics: `/esp32_serial_bridge/tx` (publish `std_msgs/String` to device), `/esp32_serial_bridge/rx` (lines from device).
-
-**ESP32 firmware**
-
-Open your ESP32-S3 PlatformIO project; **baud rate** must match the bridge (e.g. 115200).
-
-<a id="en-status"></a>
-
-### Implementation status
-
-| Item | State | Notes |
-|------|-------|------|
-| ROS serial bridge (text lines) | Done | See `roslaunch` above |
-| Binary protocol / custom `.msg` | Not done | Align frame format with ESP32 |
-| ESP32 UART command + telemetry | Partial | Mostly debug `Serial` + servo I2C today |
-| Encoder motors / chassis in firmware | Not done | Extend per your driver board |
-| USB camera → web | Not done | Add in `software/` stack or a separate service |
-| Web ↔ ROS | Not done | Typical: `rosbridge_suite` or a small HTTP API |
-
-See `LICENSE` in the repo root.
-
-<p align="right"><a href="#lang-zh">Continue in 简体中文 →</a></p>
-
----
-
-<a id="lang-zh"></a>
-
-## 简体中文文档（OmniRoam）
-
-**返回英文:** [English documentation ↑](#lang-en)
-
-快速链接: [目录结构](#repo-tree) · [项目简介](#zh-overview) · [系统架构](#zh-architecture) · [仓库结构](#zh-repo) · [开发与运行](#zh-dev) · [实现状态](#zh-status)
-
-<a id="zh-overview"></a>
-
-### 项目简介
-
-**OmniRoam** 是一套围绕**三轮全向（全驱）底盘**与**车载机械臂**搭建的实验平台：支持遥控与基础自主、机械臂抓取及小货舱作业；采用**上位机（x86 Linux + ROS 1）+ ESP32-S3** 分工，固件与 ROS 侧代码开源，适用于学习与小规模演示。
-
-| 方向 | 内容 |
-|------|------|
-| 底盘 | **三轮全向轮**：平面内平移与旋转（取决于轮距布局与控制分配） |
-| 机械臂 | 车载机械臂抓取小物体并放入车身货舱 |
-| 移动 | 全向行驶、循迹、路径跟随等（依实际传感器与算法） |
-| 遥控 | 遥控底盘与机械臂 |
-
-**设计说明**：算力与实时控制分离；底盘与轻量操作共用同一套硬件平台。
-
-<a id="zh-architecture"></a>
-
-### 系统架构
-
-#### 硬件拓扑
-
-| 角色 | 硬件 / 软件 | 说明 |
-|------|----------------|------|
-| 上位机 | x86_64，Linux，**ROS 1 Noetic** | 规划、感知、人机交互；USB **摄像头**用于网页视频（与串口控制相互独立） |
-| 链路 | **USB → UART**（如 **CH340**） | **TX/RX 交叉 + 共地**，**双向**通信；Linux 上多为 `/dev/ttyUSB*`；用户需加入 `dialout` 组 |
-| 下位机 | **ESP32-S3** | 固件一般在独立 PlatformIO 工程（UART 与桥接节点一致即可） |
-| 执行 | **I2C → 控制板** | PWM 驱动、编码电机等由控制板与固件方案决定 |
-
-#### 数据流（示意）
-
-```
-网页 / ROS 节点（x86）
-        │  USB-UART（双向）
-        ▼
-   ESP32-S3
-        │  I2C
-        ▼
-     控制板 ──► PWM / 编码电机等
-
-USB 摄像头（x86） ──► 网页视频（不经过 ESP32）
-```
-
-#### ROS 与串口（当前设计）
-
-- Catkin 工作区：`software/ros/catkin_ws/`（或仓库根旧布局 `catkin_ws/`）；进入环境：`source setup_ros1.bash`。
-- 包 `simple_robotic_arm` 提供**按行文本**串口桥 `esp32_serial_bridge.py`（话题 `~tx` / `~rx`），便于与固件 `Serial` 打印联调。
-- **正式协议**（关节角、编码器回传、帧格式与校验）需在 ESP32 与桥接节点上共同约定后再改代码。
-
-<a id="zh-repo"></a>
-
-### 仓库结构
-
-| 路径 | 说明 |
-|------|------|
-| `setup_ros1.bash` | 加载 `/opt/ros/noetic` 与本仓库 Catkin `devel`（见 `scripts/setup_ros1.bash`） |
-| `software/ros/catkin_ws/` | ROS 1 Catkin 工作区；`build/`、`devel/` 一般为本地生成，通常不提交 |
-| `software/ros/catkin_ws/src/simple_robotic_arm/` | ROS 包（若已检出）：串口桥、launch 等 |
-| `software/frontend/`、`software/backend/` | 上位机控制台：Vue + Vite、Go 服务；见 `software/README.md` |
-| `hardware/3mf_print/` | 3D 打印 `.3mf` 零件 |
-| `setup_hostpc_ubuntu20.sh` | **Ubuntu 20.04** 新上位机一键装：Noetic、Go、Node/pnpm、`catkin_make`、串口组 |
-| `LICENSE` | 许可证 |
-
-<a id="zh-dev"></a>
-
-### 开发与运行
-
-**全新 Ubuntu 20.04 上位机**
-
-```bash
-cd /path/to/OmniRoam
-bash setup_hostpc_ubuntu20.sh
-```
-
-**ROS（上位机）**
-
-```bash
-source /path/to/OmniRoam/setup_ros1.bash
-cd software/ros/catkin_ws && catkin_make && source devel/setup.bash
-```
-
-**串口桥（连接 CH340 对应设备）**
-
-```bash
-sudo apt install python3-serial   # 若未安装
-roslaunch simple_robotic_arm esp32_serial_bridge.launch port:=/dev/ttyUSB0
-```
-
-话题示例：`/esp32_serial_bridge/tx`（发字符串）、`/esp32_serial_bridge/rx`（收行）。
-
-**ESP32 固件**
-
-在 ESP32-S3 的 PlatformIO 工程中打开并烧录，波特率需与桥接节点一致（如 115200）。
-
-<a id="zh-status"></a>
-
-### 实现状态
-
-| 模块 | 状态 | 备注 |
-|------|------|------|
-| ROS 串口桥（文本行） | 已有 | 见上文 `roslaunch` |
-| 串口二进制协议 / 自定义 `.msg` | 未做 | 需与 ESP32 统一帧格式 |
-| ESP32 UART 命令解析与状态上报 | 未完善 | 当前偏 `Serial` 调试与舵机控制 |
-| 编码电机 / 底盘在固件中的实现 | 未完善 | 依控制板与硬件继续开发 |
-| USB 摄像头 → 网页 | 未做 | 可在 `software/` 或独立服务中实现 |
-| 网页 ↔ ROS | 未做 | 常见方案：`rosbridge_suite` 或自建 HTTP API |
-
-许可证见仓库根目录 `LICENSE`。
-
-<p align="right"><a href="#lang-en">Back to English ↑</a></p>
+C 后端默认使用轻量账号文件 `hostpc-users.cauth`，不再依赖 Go 或 MySQL。`database/` 保留给其它实验模块按需使用。
