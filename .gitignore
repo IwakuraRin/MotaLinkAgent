@@ -98,3 +98,8 @@ hostpc-users.db
 backend/hostpc-auth-secret
 backend/hostpc-users.db
 backend/hostpc-users.sqlite
+
+# Frontend dependencies
+frontend/node_modules/
+frontend/.vite/
+frontend/.vue-global-types/
