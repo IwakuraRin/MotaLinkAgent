@@ -103,3 +103,7 @@ backend/hostpc-users.sqlite
 frontend/node_modules/
 frontend/.vite/
 frontend/.vue-global-types/
+
+# C control core build output
+backend/amseokbot-control-core
+backend/hostpc-c

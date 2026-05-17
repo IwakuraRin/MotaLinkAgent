@@ -23,7 +23,7 @@ func Parse() Config {
 	flag.StringVar(&cfg.StaticDir, "static", "../frontend/dist", "frontend static directory")
 	flag.StringVar(&cfg.Settings, "settings", "../backend/hostpc-settings.json", "settings JSON path")
 	flag.StringVar(&cfg.Users, "users", "../backend/hostpc-users.cauth", "user auth file path")
-	flag.StringVar(&cfg.ControlCore, "control-core", "../backend/hostpc-c", "C control core binary path")
+	flag.StringVar(&cfg.ControlCore, "control-core", "../backend/amseokbot-control-core", "C control core binary path")
 	flag.Parse()
 	return cfg
 }

@@ -1,16 +1,32 @@
-# OmniRoam HostPC Go API Layer
+# AmseokBot Go API Layer
 
-本目录是 HostPC 的 Go API 层。C 后端保留为底层控制核心，Go 负责 HTTP API、鉴权、静态前端托管和轻量系统接口。
+本目录是 AmseokBot 的 Go API 层。Go 负责对手机 App、前端和外部服务提供 HTTP/WebSocket API，并通过本地进程命令调用 C 控制核心。
 
-## 构建与运行
+## 职责边界
 
-```bash
-make
-./hostpc-api -addr 0.0.0.0:8080 -static ../frontend/dist -settings ../backend/hostpc-settings.json -users ../backend/hostpc-users.cauth -control-core ../backend/hostpc-c
+- HTTP API
+- 登录鉴权
+- 手机 App / 前端通信
+- 配置管理
+- 文件管理
+- 串口设备枚举
+- 调用 C 控制核心
+
+Go 层不直接实现底盘运动学、电机控制和机械臂底层控制，这些能力由 `../backend/amseokbot-control-core` 提供。
+
+## 控制接口
+
+```text
+GET  /api/control/health
+POST /api/control/chassis/move
+POST /api/control/arm/joints
+POST /api/control/stop
 ```
 
-## 分层约定
+示例请求：
 
-- C：硬件控制、串口/机器人底层能力，后续可通过进程或本地 socket 暴露。
-- Go：登录、会话、Web API、文件浏览、串口枚举、前端静态资源。
-- 前端：继续请求原有 `/api/*` 路径，避免大改 UI。
+```json
+{"vx_mps":0.2,"vy_mps":0,"wz_radps":0}
+```
+
+Go API 会调用 C 控制核心，返回轮速和下位机串口协议帧。
