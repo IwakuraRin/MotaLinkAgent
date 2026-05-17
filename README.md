@@ -1,46 +1,59 @@
-# software（一体软件包）
+# AmseokBot Milo
 
-OmniRoam 在单机上的**一体软件包**：ROS、上位机前后端、可选 MySQL、桌面小工具与部署脚本，按目录拆分，互不揉在一起。仓库内路径为 **`software/`**（原 `OmniControlPanel/` 已迁入此处）。
+AmseokBot Milo 是机器人上位机软件仓库，按 C 控制核心、Go API 层、ROS 能力层和前端界面分开维护。
 
-## 目录结构
+## 分层架构
 
-| 目录 | 说明 |
+```text
+frontend / mobile app
+        |
+        | HTTP / WebSocket
+        v
+backend-go
+        |
+        | local process / future Unix socket
+        v
+backend
+        |
+        | serial protocol / low latency control
+        v
+ATmega2560 / ESP32 / motor drivers
+
+ros
+        |
+        | topics / launch / perception / kinematics
+        v
+camera / YOLO / navigation / sensor nodes
+```
+
+## 目录职责
+
+| 目录 | 职责 |
 |------|------|
-| `ros/` | ROS 1（Noetic）Catkin 工作区 |
-| `frontend/` | 上位机 **Vue 3 + Vite** 前端，`pnpm build` → `dist/` |
-| `backend/` | 上位机 **C** HTTP/WebSocket 服务，读取 `frontend/dist` |
-| `deploy/` | systemd 安装、`hostpc-self-update.sh` 等生产部署脚本 |
-| `database/` | 可选：Docker Compose 启动 MySQL |
-| `systeminfo/` | 可选：桌面系统信息小工具（见该目录） |
+| `backend/` | C 语言控制核心：电机控制、串口协议、底盘运动、机械臂控制、安全限幅、本地命令接口 |
+| `backend-go/` | Go API 层：HTTP API、登录鉴权、前端/手机通信、配置管理、文件管理、调用 C 控制核心 |
+| `ros/` | ROS 层：运动学、传感器节点、相机、YOLO、导航和机器人实验节点 |
+| `frontend/` | 前端界面，通过 Go API 控制机器人和查看状态 |
+| `database/` | 可选数据库实验配置 |
+| `deploy/` | 后续 deb/systemd/镜像部署文件 |
+| `systeminfo/` | 可选系统信息小工具 |
 
-## 推荐启动方式
-
-在 **OmniRoam 仓库根** 执行：
-
-```bash
-./omniroam.sh
-```
-
-会识别 `software/`（或旧布局 `OmniControlPanel` / `OmniOS` / `HostPC`）下的前后端，先做环境检测，再启动后端与 Vite（可用 `OMNIROAM_NO_VITE=1` 仅 8080），并进入终端菜单。
-
-仅构建并启动后端（无交互菜单）时：
+## 构建控制核心
 
 ```bash
-bash software/start-hostpc.sh
+cd backend
+make
+./amseokbot-control-core health
 ```
 
-加载 ROS 覆盖层：
+## 验证 Go API
 
 ```bash
-source /path/to/OmniRoam/setup_ros1.bash
+cd backend-go
+go test ./...
+go run ./cmd/hostpc-api -control-core ../backend/amseokbot-control-core
 ```
 
-## 数据库（可选）
+## 运行数据原则
 
-```bash
-cd software/database
-cp .env.example .env
-docker compose up -d
-```
-
-C 后端默认使用轻量账号文件 `hostpc-users.cauth`，不再依赖 Go 或 MySQL。`database/` 保留给其它实验模块按需使用。
+真实密钥、用户数据库和机器人本机数据不提交到 Git。以后打包成 deb 时，由安装脚本或首次启动流程生成到 `/etc/amseokbot/` 和 `/var/lib/amseokbot/`。

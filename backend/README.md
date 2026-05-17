@@ -1,36 +1,29 @@
-# OmniRoam HostPC C Control Core
+# AmseokBot C Control Core
 
-本目录保留 C 语言版 HostPC 控制核心。运行时推荐由 `software/backend-go` 的 Go API 层对外提供 HTTP/API，本目录的 `hostpc-c` 继续作为底层控制能力和兼容实现。
+本目录是 AmseokBot 的 C 语言底层控制核心。C 层只负责硬件相关、低延迟、可预测的控制能力，不再负责 HTTP、登录、前端文件托管等上层业务。
 
-## 构建与运行
+## 职责边界
+
+- 电机控制
+- 串口协议组包
+- 三全向轮底盘运动控制
+- 机械臂关节命令
+- 安全限幅和急停命令
+- 本地进程命令接口，后续可升级为 Unix socket 或静态库接口
+
+## 构建
 
 ```bash
 make
-./hostpc-c -addr 0.0.0.0:8080 -static ../frontend/dist
 ```
 
-完整启动推荐从 `software/` 目录执行，脚本会先构建 C 控制核心，再启动 Go API 层：
+## 命令示例
 
 ```bash
-bash start-hostpc.sh
+./amseokbot-control-core health
+./amseokbot-control-core chassis --vx 0.2 --vy 0 --wz 0
+./amseokbot-control-core arm --shoulder-yaw 0 --shoulder-pitch 30 --elbow 45 --wrist 0
+./amseokbot-control-core stop
 ```
 
-## 主要功能
-
-- 保留 C 语言底层控制和兼容 HTTP 实现。
-- Go API 层负责对外 HTTP、登录会话、设置、串口、文件列表和静态前端托管。
-- 后续新增机器人硬件控制时，优先把 C 能力封装成进程命令、本地 socket 或库接口，再由 Go API 调用。
-
-## 默认账号
-
-首次运行会生成 `hostpc-users.cauth`：
-
-```text
-user / change-me-on-first-login
-```
-
-可以用环境变量覆盖首次初始化账号：
-
-```bash
-HOSTPC_USER=admin HOSTPC_PASSWORD='your-password' ./hostpc-c
-```
+输出为 JSON，Go API 层负责解析 JSON 并通过 HTTP API 提供给手机 App、前端或 ROS 辅助进程。

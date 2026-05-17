@@ -50,6 +50,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/auth/change-password", s.handleChangePassword)
 	s.mux.HandleFunc("/api/settings", s.handleSettings)
 	s.mux.HandleFunc("/api/serial/devices", s.handleSerialDevices)
+	s.mux.HandleFunc("/api/control/health", s.handleControlHealth)
+	s.mux.HandleFunc("/api/control/chassis/move", s.handleControlChassisMove)
+	s.mux.HandleFunc("/api/control/arm/joints", s.handleControlArmJoints)
+	s.mux.HandleFunc("/api/control/stop", s.handleControlStop)
 	s.mux.HandleFunc("/api/fs/list", s.handleFSList)
 	s.mux.HandleFunc("/api/updates/status", s.handleUpdatesStatus)
 	s.mux.HandleFunc("/api/updates/apply", s.handleUpdatesApply)
@@ -212,7 +216,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	_, controlErr := os.Stat(s.cfg.ControlCore)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":           true,
-		"service":      "hostpc-go-api",
+		"service":      "amseokbot-go-api",
 		"control_core": s.cfg.ControlCore,
 		"control_ok":   controlErr == nil,
 		"time":         time.Now().Format(time.RFC3339),
@@ -436,6 +440,6 @@ var wsUpgrader = websocket.Upgrader{
 }
 
 func ListenAndServe(cfg config.Config, handler http.Handler) error {
-	fmt.Printf("OmniRoam Go API listening on %s static=%s control=%s\n", cfg.Addr, cfg.StaticDir, cfg.ControlCore)
+	fmt.Printf("AmseokBot Go API listening on %s static=%s control=%s\n", cfg.Addr, cfg.StaticDir, cfg.ControlCore)
 	return http.ListenAndServe(cfg.Addr, handler)
 }
