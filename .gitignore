@@ -123,3 +123,6 @@ skill.md
 # Local IDE cache
 .vs/
 **/.vs/
+
+# AmseokBot local shell runtime
+.amseokbot/
