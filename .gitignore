@@ -107,3 +107,19 @@ frontend/.vue-global-types/
 # C control core build output
 backend/amseokbot-control-core
 backend/hostpc-c
+
+# Local AI assistant skills
+SKILL.md
+skill.md
+**/SKILL.md
+**/skill.md
+
+# Runtime secrets and local databases
+*secret*
+*.db
+*.sqlite
+.env
+
+# Local IDE cache
+.vs/
+**/.vs/
