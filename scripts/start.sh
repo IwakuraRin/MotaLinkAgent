@@ -123,28 +123,74 @@ is_running() {
   [[ -f "${AMSEOKBOT_PID_FILE}" ]] && kill -0 "$(cat "${AMSEOKBOT_PID_FILE}")" >/dev/null 2>&1
 }
 
-health_url() {
-  local host port
+api_port() {
+  printf '%s\n' "${AMSEOKBOT_API_ADDR##*:}"
+}
+
+bind_host() {
+  local host
   host="${AMSEOKBOT_API_ADDR%:*}"
-  port="${AMSEOKBOT_API_ADDR##*:}"
-  if [[ "${host}" == "0.0.0.0" || "${host}" == "::" || -z "${host}" ]]; then
-    host="127.0.0.1"
+  printf '%s\n' "${host:-0.0.0.0}"
+}
+
+lan_ips() {
+  if have_cmd ip; then
+    {
+      ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "src") print $(i + 1) }'
+      ip -4 -o addr show scope global up 2>/dev/null | awk '$2 !~ /^(docker|br-|veth|lxdbr|virbr)/ { split($4, a, "/"); print a[1] }'
+    } | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ && $0 !~ /^127\\./ && !seen[$0]++'
+    return
   fi
-  printf 'http://%s:%s/api/health' "${host}" "${port}"
+  if have_cmd hostname; then
+    hostname -I 2>/dev/null | tr ' ' '\n' | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ && $0 !~ /^127\\./ && !seen[$0]++ { print }'
+  fi
+}
+
+health_urls() {
+  local host port ip printed=0
+  host="$(bind_host)"
+  port="$(api_port)"
+  if [[ "${host}" == "0.0.0.0" || "${host}" == "::" || "${host}" == "*" ]]; then
+    while IFS= read -r ip; do
+      [[ -n "${ip}" ]] || continue
+      printf 'http://%s:%s/api/health\n' "${ip}" "${port}"
+      printed=1
+    done < <(lan_ips)
+    [[ "${printed}" -eq 1 ]] && return
+    printf 'http://127.0.0.1:%s/api/health\n' "${port}"
+    return
+  fi
+  printf 'http://%s:%s/api/health\n' "${host}" "${port}"
+}
+
+frontend_urls() {
+  health_urls | sed 's#/api/health$#/#'
 }
 
 verify_access() {
   have_cmd curl || return
-  local url
-  url="$(health_url)"
-  for _ in {1..30}; do
-    if curl -fsS "${url}" >/dev/null 2>&1; then
-      log "服务访问正常：${url}"
-      return
-    fi
-    sleep 0.2
-  done
-  die "服务已启动但健康检查失败：${url}，请查看日志 ${AMSEOKBOT_API_LOG}"
+  local url ok=0
+  while IFS= read -r url; do
+    [[ -n "${url}" ]] || continue
+    for _ in {1..30}; do
+      if curl -fsS "${url}" >/dev/null 2>&1; then
+        log "局域网服务访问正常：${url}"
+        ok=1
+        break
+      fi
+      sleep 0.2
+    done
+    [[ "${ok}" -eq 1 ]] && break
+  done < <(health_urls)
+
+  if [[ "${ok}" -ne 1 ]]; then
+    die "服务已启动但局域网健康检查失败，请确认网卡 IP、防火墙和端口 ${AMSEOKBOT_API_ADDR}，日志：${AMSEOKBOT_API_LOG}"
+  fi
+
+  log "前端局域网访问地址："
+  while IFS= read -r url; do
+    [[ -n "${url}" ]] && log "  ${url}"
+  done < <(frontend_urls)
 }
 
 # ==================== API 服务启动 ====================
