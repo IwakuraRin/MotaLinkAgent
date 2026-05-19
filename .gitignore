@@ -62,6 +62,10 @@ catkin_ws/build/
 catkin_ws/devel/
 catkin_ws/install/
 catkin_ws/logs/
+ros/catkin_ws/build/
+ros/catkin_ws/devel/
+ros/catkin_ws/install/
+ros/catkin_ws/logs/
 software/ros/catkin_ws/build/
 software/ros/catkin_ws/devel/
 software/ros/catkin_ws/install/
