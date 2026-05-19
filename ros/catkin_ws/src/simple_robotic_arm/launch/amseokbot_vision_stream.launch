@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 作用：统一启动 AmseokBot 摄像头、YOLO 带框调试图和浏览器 MJPEG 推流。 -->
+
+  <!-- ==================== 摄像头输入 ==================== -->
+  <!-- 作用：读取 HostPC 上的 USB 摄像头并发布 ROS 原始图像。 -->
+  <arg name="video_device" default="/dev/video0"/>
+  <arg name="image_width" default="640"/>
+  <arg name="image_height" default="480"/>
+  <arg name="framerate" default="30"/>
+  <arg name="pixel_format" default="yuyv"/>
+  <arg name="image_topic" default="/usb_cam/image_raw"/>
+
+  <!-- ==================== YOLO 检测输出 ==================== -->
+  <!-- 作用：把检测框绘制到调试图并发布给 web_video_server。 -->
+  <arg name="debug_image_topic" default="/obstacle_detector/debug"/>
+  <arg name="model_path" default="$(find simple_robotic_arm)/models/obstacle_yolo11n_192.onnx"/>
+  <arg name="input_size" default="192"/>
+  <arg name="conf_thresh" default="0.05"/>
+  <arg name="nms_thresh" default="0.45"/>
+  <arg name="max_det" default="30"/>
+  <arg name="output_width" default="320"/>
+  <arg name="process_every_n" default="1"/>
+
+  <!-- ==================== 浏览器推流 ==================== -->
+  <!-- 作用：开放 http://HOST:8081/stream?topic=/obstacle_detector/debug 给前端显示。 -->
+  <arg name="web_video_port" default="8081"/>
+  <arg name="web_video_address" default="0.0.0.0"/>
+
+  <include file="$(find simple_robotic_arm)/launch/usb_camera_web.launch">
+    <arg name="video_device" value="$(arg video_device)"/>
+    <arg name="image_width" value="$(arg image_width)"/>
+    <arg name="image_height" value="$(arg image_height)"/>
+    <arg name="framerate" value="$(arg framerate)"/>
+    <arg name="pixel_format" value="$(arg pixel_format)"/>
+    <arg name="image_topic" value="$(arg image_topic)"/>
+    <arg name="web_video_port" value="$(arg web_video_port)"/>
+    <arg name="web_video_address" value="$(arg web_video_address)"/>
+  </include>
+
+  <include file="$(find simple_robotic_arm)/launch/yolo_obstacle_detector.launch">
+    <arg name="image_topic" value="$(arg image_topic)"/>
+    <arg name="debug_image_topic" value="$(arg debug_image_topic)"/>
+    <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="input_size" value="$(arg input_size)"/>
+    <arg name="conf_thresh" value="$(arg conf_thresh)"/>
+    <arg name="nms_thresh" value="$(arg nms_thresh)"/>
+    <arg name="max_det" value="$(arg max_det)"/>
+    <arg name="output_width" value="$(arg output_width)"/>
+    <arg name="process_every_n" value="$(arg process_every_n)"/>
+  </include>
+</launch>

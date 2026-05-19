@@ -149,8 +149,8 @@ class AtmegaSerialBridgeNode {
  private:
   void handleTx(const std_msgs::String::ConstPtr& msg) {
     std::string data = msg->data;
-    if (append_newline_ && (data.empty() || data.back() != n)) {
-      data.push_back(n);
+    if (append_newline_ && (data.empty() || data.back() != '\n')) {
+      data.push_back('\n');
     }
     serial_.writeLine(data);
   }
@@ -164,10 +164,10 @@ class AtmegaSerialBridgeNode {
         rate.sleep();
         continue;
       }
-      if (byte == n) {
+      if (byte == '\n') {
         publishLine(line);
         line.clear();
-      } else if (byte != r) {
+      } else if (byte != '\r') {
         line.push_back(byte);
       }
     }

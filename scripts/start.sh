@@ -11,11 +11,13 @@ source "${SCRIPT_DIR}/lib/common.sh"
 FOREGROUND=0
 AUTO_UPDATE=1
 AUTO_INSTALL=1
+START_ROS=1
 for arg in "$@"; do
   case "${arg}" in
     --foreground) FOREGROUND=1 ;;
     --no-update) AUTO_UPDATE=0 ;;
     --no-install) AUTO_INSTALL=0 ;;
+    --no-ros) START_ROS=0 ;;
     *) die "未知参数：${arg}" ;;
   esac
 done
@@ -80,6 +82,7 @@ check_environment() {
   [[ -r "${AMSEOKBOT_REPO_DIR}/frontend/package.json" ]] || die "缺少 frontend/package.json，前端无法构建"
   [[ -r "${AMSEOKBOT_REPO_DIR}/frontend/pnpm-lock.yaml" ]] || die "缺少 frontend/pnpm-lock.yaml，前端依赖无法锁定"
   [[ -r "${AMSEOKBOT_REPO_DIR}/backend/Makefile" ]] || die "缺少 backend/Makefile，C 控制核心无法构建"
+  [[ -d "${AMSEOKBOT_ROS_WS}/src" ]] || log "缺少 ROS 工作区源码目录，将只启动前后端：${AMSEOKBOT_ROS_WS}/src"
 
   local missing=()
   have_cmd make || missing+=("make")
@@ -167,6 +170,22 @@ frontend_urls() {
   health_urls | sed 's#/api/health$#/#'
 }
 
+video_stream_urls() {
+  local ip printed=0 host
+  host="$(bind_host)"
+  if [[ "${host}" == "0.0.0.0" || "${host}" == "::" || "${host}" == "*" ]]; then
+    while IFS= read -r ip; do
+      [[ -n "${ip}" ]] || continue
+      printf 'http://%s:%s/stream?topic=/obstacle_detector/debug\n' "${ip}" "${AMSEOKBOT_WEB_VIDEO_PORT}"
+      printed=1
+    done < <(lan_ips)
+    [[ "${printed}" -eq 1 ]] && return
+    printf 'http://127.0.0.1:%s/stream?topic=/obstacle_detector/debug\n' "${AMSEOKBOT_WEB_VIDEO_PORT}"
+    return
+  fi
+  printf 'http://%s:%s/stream?topic=/obstacle_detector/debug\n' "${host}" "${AMSEOKBOT_WEB_VIDEO_PORT}"
+}
+
 verify_access() {
   have_cmd curl || return
   local url ok=0
@@ -191,6 +210,80 @@ verify_access() {
   while IFS= read -r url; do
     [[ -n "${url}" ]] && log "  ${url}"
   done < <(frontend_urls)
+}
+
+# ==================== ROS 视觉链路 ====================
+# 作用：启动 USB 摄像头、YOLO 带框调试图和 web_video_server 推流服务。
+# ======================================================
+source_ros_env() {
+  local ros_setup="/opt/ros/${AMSEOKBOT_ROS_DISTRO}/setup.bash"
+  [[ -r "${ros_setup}" ]] || return 1
+  set +u
+  # shellcheck disable=SC1090
+  source "${ros_setup}"
+  if [[ -r "${AMSEOKBOT_ROS_WS}/devel/setup.bash" ]]; then
+    # shellcheck disable=SC1090
+    source "${AMSEOKBOT_ROS_WS}/devel/setup.bash"
+  fi
+  set -u
+}
+
+ros_is_running() {
+  [[ -f "${AMSEOKBOT_ROS_PID_FILE}" ]] && kill -0 "$(cat "${AMSEOKBOT_ROS_PID_FILE}")" >/dev/null 2>&1
+}
+
+ensure_ros_workspace_built() {
+  [[ "${START_ROS}" -eq 1 ]] || return
+  [[ -d "${AMSEOKBOT_ROS_WS}/src" ]] || {
+    log "未找到 ROS 工作区，跳过 ROS 启动：${AMSEOKBOT_ROS_WS}"
+    return
+  }
+  if ! source_ros_env; then
+    log "未找到 ROS ${AMSEOKBOT_ROS_DISTRO} 环境，跳过 ROS 启动"
+    return
+  fi
+  have_cmd roslaunch || {
+    log "缺少 roslaunch，跳过 ROS 启动"
+    return
+  }
+  if ! rospack find "${AMSEOKBOT_ROS_PACKAGE}" >/dev/null 2>&1; then
+    have_cmd catkin_make || die "缺少 catkin_make，无法构建 ROS 工作区"
+    log "构建 ROS 工作区：${AMSEOKBOT_ROS_WS}"
+    cd "${AMSEOKBOT_ROS_WS}"
+    catkin_make
+    source_ros_env || die "ROS 工作区构建后仍无法加载环境"
+  fi
+}
+
+start_ros_stack() {
+  [[ "${START_ROS}" -eq 1 ]] || {
+    log "已跳过 ROS 启动"
+    return
+  }
+  [[ -d "${AMSEOKBOT_ROS_WS}/src" ]] || return
+  if ros_is_running; then
+    log "ROS 视觉链路已在运行，PID=$(cat "${AMSEOKBOT_ROS_PID_FILE}")"
+    return
+  fi
+  if ! source_ros_env; then
+    log "ROS 环境不可用，未启动视觉链路"
+    return
+  fi
+  if ! rospack find "${AMSEOKBOT_ROS_PACKAGE}" >/dev/null 2>&1; then
+    log "ROS 包不可用，未启动视觉链路：${AMSEOKBOT_ROS_PACKAGE}"
+    return
+  fi
+  log "后台启动 ROS 视觉链路：${AMSEOKBOT_ROS_PACKAGE} ${AMSEOKBOT_ROS_LAUNCH}"
+  cd "${AMSEOKBOT_ROS_WS}"
+  nohup roslaunch "${AMSEOKBOT_ROS_PACKAGE}" "${AMSEOKBOT_ROS_LAUNCH}" \
+    video_device:="${AMSEOKBOT_VIDEO_DEVICE}" \
+    web_video_port:="${AMSEOKBOT_WEB_VIDEO_PORT}" >>"${AMSEOKBOT_ROS_LOG}" 2>&1 &
+  printf '%s\n' "$!" >"${AMSEOKBOT_ROS_PID_FILE}"
+  log "ROS 已启动，PID=$(cat "${AMSEOKBOT_ROS_PID_FILE}")，日志：${AMSEOKBOT_ROS_LOG}"
+  log "YOLO 推流地址："
+  while IFS= read -r url; do
+    [[ -n "${url}" ]] && log "  ${url}"
+  done < <(video_stream_urls)
 }
 
 # ==================== API 服务启动 ====================
@@ -221,10 +314,13 @@ main() {
   auto_update_from_git
   check_environment
   ensure_built
+  ensure_ros_workspace_built
   if [[ "${FOREGROUND}" -eq 1 ]]; then
+    start_ros_stack
     start_foreground
   else
     start_background
+    start_ros_stack
   fi
 }
 

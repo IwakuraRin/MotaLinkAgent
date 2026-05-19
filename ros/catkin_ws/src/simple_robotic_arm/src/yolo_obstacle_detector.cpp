@@ -64,15 +64,27 @@ class YoloObstacleDetectorNode {
  public:
   YoloObstacleDetectorNode() : private_nh_("~") {
     loadParams();
-    net_ = cv::dnn::readNetFromONNX(model_path_);
-    net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-    net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    loadModel();
     debug_pub_ = nh_.advertise<sensor_msgs::Image>(debug_topic_, 1);
     image_sub_ = nh_.subscribe(image_topic_, 1, &YoloObstacleDetectorNode::handleImage, this);
     ROS_INFO("yolo_obstacle_detector_cpp: image=%s debug=%s model=%s", image_topic_.c_str(), debug_topic_.c_str(), model_path_.c_str());
   }
 
  private:
+  void loadModel() {
+    try {
+      net_ = cv::dnn::readNetFromONNX(model_path_);
+      net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+      net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+      model_ready_ = true;
+      model_error_.clear();
+    } catch (const cv::Exception& ex) {
+      model_ready_ = false;
+      model_error_ = ex.what();
+      ROS_ERROR("yolo_obstacle_detector model load failed: %s", model_error_.c_str());
+    }
+  }
+
   void loadParams() {
     const std::string package_path = ros::package::getPath("simple_robotic_arm");
     const std::string default_model = package_path + "/models/obstacle_yolo11n.onnx";
@@ -110,7 +122,16 @@ class YoloObstacleDetectorNode {
     }
 
     const auto begin = std::chrono::steady_clock::now();
-    std::vector<DetectionBox> boxes = infer(bgr);
+    std::vector<DetectionBox> boxes;
+    if (model_ready_) {
+      try {
+        boxes = infer(bgr);
+      } catch (const cv::Exception& ex) {
+        model_ready_ = false;
+        model_error_ = ex.what();
+        ROS_ERROR("yolo_obstacle_detector inference failed: %s", model_error_.c_str());
+      }
+    }
     const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
     last_fps_ = elapsed > 1e-6 ? 1.0 / elapsed : 0.0;
     publishDebug(msg->header, bgr, boxes);
@@ -186,6 +207,10 @@ class YoloObstacleDetectorNode {
     if (draw_fps_) {
       status += " infer: " + std::to_string(last_fps_).substr(0, 4) + " fps";
     }
+    if (!model_ready_) {
+      status = "YOLO model unavailable";
+      cv::putText(bgr, "model error: check ONNX/OpenCV version", cv::Point(10, 54), cv::FONT_HERSHEY_SIMPLEX, 0.55, cv::Scalar(0, 0, 255), 2);
+    }
     cv::putText(bgr, status, cv::Point(10, 26), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
     cv_bridge::CvImage out(header, "bgr8", bgr);
     debug_pub_.publish(out.toImageMsg());
@@ -199,6 +224,8 @@ class YoloObstacleDetectorNode {
   std::string image_topic_;
   std::string debug_topic_;
   std::string model_path_;
+  bool model_ready_ = false;
+  std::string model_error_;
   int input_size_ = 512;
   double conf_thresh_ = 0.05;
   double nms_thresh_ = 0.45;
