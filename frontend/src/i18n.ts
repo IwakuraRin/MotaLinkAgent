@@ -69,10 +69,10 @@ const M: Record<Locale, Record<string, string>> = {
     'serial.refresh': 'Refresh device list',
     'serial.scanning': 'Scanning…',
     'serial.unassigned': '— Not assigned —',
-    'serial.role.esp32_uart': 'ESP32 / chassis UART',
+    'serial.role.atmega_uart': 'ATmega / chassis UART',
     'serial.role.aux_serial': 'Auxiliary serial (optional)',
     'serial.hint':
-      'The host scans Linux /dev (ttyUSB*, ttyACM*, /dev/serial/by-id). Prefer a by-id path so the same USB port stays stable when the kernel assigns ttyUSB0 vs ttyACM0. Saved to hostpc-settings.json → serial_roles for ROS/scripts (e.g. jq .serial_roles.esp32_uart).',
+      'The host scans Linux /dev (ttyUSB*, ttyACM*, /dev/serial/by-id). Prefer a by-id path so the same USB port stays stable when the kernel assigns ttyUSB0 vs ttyACM0. Saved to hostpc-settings.json → serial_roles for ROS/scripts (e.g. jq .serial_roles.atmega_uart).',
     'serial.nonlinux': 'Serial enumeration runs on the Linux host only; this API returns an empty list on other OSes.',
     'serial.emptyList': 'No serial devices found. Plug in USB-UART and click Refresh (Linux + dialout group).',
     'conn.section': 'Connection',
@@ -85,7 +85,7 @@ const M: Record<Locale, Record<string, string>> = {
     'disp.logBuffer': 'Log buffer (lines, 50–5000)',
     'ros.section': 'ROS / vision',
     'ros.body':
-      'line_follow_vision.py parameters are set in ROS (rosparam / dynamic_reconfigure). This UI binds an external camera URL, serial ports, log size, and WebSocket. Wire your launch file to read hostpc-settings.json for the ESP32 device path.',
+      'Vision and motion parameters are set in ROS C++ nodes (rosparam / dynamic_reconfigure). This UI binds an external camera URL, serial ports, log size, and WebSocket. Wire your launch file to read hostpc-settings.json for the ATmega device path.',
     'video.panelTitle': 'Video — USB Camera',
     'video.noUrl': 'No camera URL',
     'video.emptyHint.before': 'Open',
@@ -225,6 +225,9 @@ const M: Record<Locale, Record<string, string>> = {
     'update.deployOk': 'Update finished. The service may have restarted; refresh the page if the connection drops.',
     'update.deployFail': 'Update failed.',
     'update.busy': 'Another update is already running.',
+    'update.checkNow': 'Check for updates',
+    'update.checking': 'Checking…',
+    'update.upToDate': 'Already up to date.',
   },
   zh: {
     'app.subtitle': '上位机控制台',
@@ -279,10 +282,10 @@ const M: Record<Locale, Record<string, string>> = {
     'serial.refresh': '刷新设备列表',
     'serial.scanning': '扫描中…',
     'serial.unassigned': '— 未分配 —',
-    'serial.role.esp32_uart': 'ESP32 / 底盘串口',
+    'serial.role.atmega_uart': 'ATmega / 底盘串口',
     'serial.role.aux_serial': '辅助串口（可选）',
     'serial.hint':
-      '由上位机 Linux 扫描 /dev（ttyUSB*、ttyACM*、/dev/serial/by-id）。建议选用 by-id 路径，这样同一物理 USB 在 ttyUSB0 与 ttyACM0 之间变化时地址仍稳定。结果写入 hostpc-settings.json 的 serial_roles，供 ROS/脚本读取（如 jq .serial_roles.esp32_uart）。',
+      '由上位机 Linux 扫描 /dev（ttyUSB*、ttyACM*、/dev/serial/by-id）。建议选用 by-id 路径，这样同一物理 USB 在 ttyUSB0 与 ttyACM0 之间变化时地址仍稳定。结果写入 hostpc-settings.json 的 serial_roles，供 ROS/脚本读取（如 jq .serial_roles.atmega_uart）。',
     'serial.nonlinux': '串口枚举仅在 Linux 上位机可用；其他系统下此接口返回空列表。',
     'serial.emptyList': '未发现串口设备。请插入 USB 转串口后点刷新（需 Linux 且在 dialout 组）。',
     'conn.section': '连接',
@@ -295,7 +298,7 @@ const M: Record<Locale, Record<string, string>> = {
     'disp.logBuffer': '日志保留行数（50–5000）',
     'ros.section': 'ROS / 视觉',
     'ros.body':
-      '巡线等参数仍在 ROS 中设置（rosparam / dynamic_reconfigure）。此处可绑定外部摄像头流地址、串口、日志与 WebSocket。可在 launch 中读取 hostpc-settings.json 里的 ESP32 串口路径。',
+      '巡线等参数仍在 ROS 中设置（rosparam / dynamic_reconfigure）。此处可绑定外部摄像头流地址、串口、日志与 WebSocket。可在 launch 中读取 hostpc-settings.json 里的 ATmega 串口路径。',
     'video.panelTitle': '视频 — USB 摄像头',
     'video.noUrl': '未设置摄像头地址',
     'video.emptyHint.before': '打开右上角',
@@ -431,6 +434,9 @@ const M: Record<Locale, Record<string, string>> = {
     'update.deployOk': '更新完成。服务可能已重启；若断线请刷新页面。',
     'update.deployFail': '更新失败。',
     'update.busy': '已有更新任务在执行。',
+    'update.checkNow': '检查更新',
+    'update.checking': '正在检查…',
+    'update.upToDate': '当前已经是最新版本。',
   },
   ko: {
     'app.subtitle': '호스트 콘솔',
@@ -486,7 +492,7 @@ const M: Record<Locale, Record<string, string>> = {
     'serial.refresh': '장치 목록 새로 고침',
     'serial.scanning': '검색 중…',
     'serial.unassigned': '— 미지정 —',
-    'serial.role.esp32_uart': 'ESP32 / 섀시 UART',
+    'serial.role.atmega_uart': 'ATmega / 섀시 UART',
     'serial.role.aux_serial': '보조 시리얼(선택)',
     'serial.hint':
       'Linux 호스트가 /dev(ttyUSB*, ttyACM*, /dev/serial/by-id)를 검색합니다. 같은 USB에 ttyUSB0과 ttyACM0가 바뀌어도 경로가 유지되도록 by-id 경로를 권장합니다. hostpc-settings.json의 serial_roles에 저장되며 ROS/스크립트에서 읽을 수 있습니다.',
@@ -502,7 +508,7 @@ const M: Record<Locale, Record<string, string>> = {
     'disp.logBuffer': '로그 줄 수(50–5000)',
     'ros.section': 'ROS / 비전',
     'ros.body':
-      '라인 트래킹 등 매개변수는 ROS(rosparam / dynamic_reconfigure)에서 설정합니다. 여기서는 외부 카메라 URL, 시리얼, 로그, WebSocket을 다룹니다. launch에서 hostpc-settings.json의 ESP32 경로를 읽도록 연결할 수 있습니다.',
+      '라인 트래킹 등 매개변수는 ROS(rosparam / dynamic_reconfigure)에서 설정합니다. 여기서는 외부 카메라 URL, 시리얼, 로그, WebSocket을 다룹니다. launch에서 hostpc-settings.json의 ATmega 경로를 읽도록 연결할 수 있습니다.',
     'video.panelTitle': '영상 — USB 카메라',
     'video.noUrl': '카메라 URL 없음',
     'video.emptyHint.before': '오른쪽 위',
@@ -643,6 +649,9 @@ const M: Record<Locale, Record<string, string>> = {
     'update.deployOk': '업데이트가 완료되었습니다. 서비스가 재시작되었을 수 있으니 연결이 끊기면 새로 고침하세요.',
     'update.deployFail': '업데이트에 실패했습니다.',
     'update.busy': '다른 업데이트가 이미 실행 중입니다.',
+    'update.checkNow': '업데이트 확인',
+    'update.checking': '확인 중…',
+    'update.upToDate': '이미 최신 버전입니다.',
   },
 }
 

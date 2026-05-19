@@ -5,7 +5,7 @@
 //
 import { t, setLocale, type Locale } from '../i18n'
 
-const SERIAL_ROLE_KEYS = ['esp32_uart', 'aux_serial'] as const
+const SERIAL_ROLE_KEYS = ['atmega_uart', 'aux_serial'] as const
 type SerialRoleKey = (typeof SERIAL_ROLE_KEYS)[number]
 type SerialDev = { path: string; target: string; kind: string }
 
@@ -39,7 +39,7 @@ function deviceLabel(d: SerialDev): string {
 }
 
 function serialRoleTitle(role: SerialRoleKey): string {
-  if (role === 'esp32_uart') return t('serial.role.esp32_uart')
+  if (role === 'atmega_uart') return t('serial.role.atmega_uart')
   if (role === 'aux_serial') return t('serial.role.aux_serial')
   return role
 }

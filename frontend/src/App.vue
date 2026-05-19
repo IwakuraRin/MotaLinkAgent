@@ -20,7 +20,6 @@ const LS_MAXLOG = 'omniroam.console_max_lines'
 const LS_KEYBOARD = 'omniroam.keyboard_enabled'
 const LS_PWD_DISMISS = 'omniroam.pwd_dismiss'
 const LS_UPDATE_DISMISS = 'omniroam.update.dismiss_remote_sha'
-const UPDATE_POLL_MS = 10 * 60 * 1000
 
 function apiFetch(input: string, init?: RequestInit) {
   return fetch(input, { ...init, credentials: 'include' })
@@ -64,7 +63,8 @@ const updateModal = ref<'off' | 'prompt' | 'countdown' | 'deploying'>('off')
 const updateCountdown = ref(10)
 const updateDeployOutput = ref('')
 const updateDeployBusy = ref(false)
-let updatePollHandle: ReturnType<typeof setInterval> | null = null
+const updateCheckBusy = ref(false)
+const updateCheckMessage = ref('')
 let updateCountdownHandle: ReturnType<typeof setInterval> | null = null
 
 //--------//
@@ -90,42 +90,31 @@ function dismissUpdateForRemoteSha() {
   }
 }
 
-function maybeOpenUpdateModal(st: UpdateStatusPayload) {
-  if (updateModal.value !== 'off') return
-  if (!st.enabled || !st.update_available || !st.remote_sha) return
-  if (typeof sessionStorage !== 'undefined') {
-    if (sessionStorage.getItem(LS_UPDATE_DISMISS) === st.remote_sha) return
-  }
-  updateModal.value = 'prompt'
-}
-
-async function pollUpdateStatus() {
-  if (!loggedIn.value) return
+async function checkUpdateFromSettings() {
+  if (!loggedIn.value || updateCheckBusy.value) return
+  updateCheckBusy.value = true
+  updateCheckMessage.value = ''
   try {
     const r = await apiFetch('/api/updates/status')
     if (r.status === 401) {
       loggedIn.value = false
       return
     }
-    if (!r.ok) return
-    const st = (await r.json()) as UpdateStatusPayload
+    const st = (await r.json().catch(() => ({}))) as UpdateStatusPayload
     updateStatus.value = st
-    maybeOpenUpdateModal(st)
-  } catch {
-    /* offline / dev */
-  }
-}
-
-function startUpdatePolling() {
-  stopUpdatePolling()
-  void pollUpdateStatus()
-  updatePollHandle = setInterval(() => void pollUpdateStatus(), UPDATE_POLL_MS)
-}
-
-function stopUpdatePolling() {
-  if (updatePollHandle) {
-    clearInterval(updatePollHandle)
-    updatePollHandle = null
+    if (!r.ok) {
+      updateCheckMessage.value = `HTTP ${r.status}`
+    } else if (!st.enabled) {
+      updateCheckMessage.value = st.reason || t('update.notConfigured')
+    } else if (st.update_available) {
+      updateModal.value = 'prompt'
+    } else {
+      updateCheckMessage.value = t('update.upToDate')
+    }
+  } catch (e) {
+    updateCheckMessage.value = String(e)
+  } finally {
+    updateCheckBusy.value = false
   }
 }
 
@@ -229,7 +218,7 @@ watch(mainTab, (v) => {
 // 模块：控制台 — 串口列表、日志缓冲、摄像头 URL、拓扑边日志
 type SerialDev = { path: string; target: string; kind: string }
 
-const SERIAL_ROLE_KEYS = ['esp32_uart', 'aux_serial'] as const
+const SERIAL_ROLE_KEYS = ['atmega_uart', 'aux_serial'] as const
 type SerialRoleKey = (typeof SERIAL_ROLE_KEYS)[number]
 
 const consoleLines = ref<string[]>([])
@@ -250,7 +239,7 @@ const serialDevices = ref<SerialDev[]>([])
 const serialListLoading = ref(false)
 const serialHostOS = ref('')
 const serialRolesDraft = ref<Record<SerialRoleKey, string>>({
-  esp32_uart: '',
+  atmega_uart: '',
   aux_serial: '',
 })
 
@@ -470,7 +459,6 @@ async function checkSession() {
 async function bootAfterAuth() {
   await hydrateAppliedCameraUrl()
   connectWs()
-  startUpdatePolling()
   await nextTick()
   bindCamera()
 }
@@ -533,7 +521,6 @@ async function submitLogout() {
   authUsername.value = ''
   mustChangePassword.value = false
   pwdModal.value = 'off'
-  stopUpdatePolling()
   clearUpdateCountdown()
   updateModal.value = 'off'
 }
@@ -699,7 +686,7 @@ async function loadSettingsPanelData() {
         serial_roles?: Record<string, string>
       }
       const sr = j.serial_roles ?? {}
-      serialRolesDraft.value.esp32_uart = sr.esp32_uart ?? ''
+      serialRolesDraft.value.atmega_uart = sr.atmega_uart ?? sr.esp32_uart ?? ''
       serialRolesDraft.value.aux_serial = sr.aux_serial ?? ''
     }
   } catch {
@@ -714,7 +701,7 @@ function deviceLabel(d: SerialDev): string {
 }
 
 function serialRoleTitle(role: SerialRoleKey): string {
-  if (role === 'esp32_uart') return t('serial.role.esp32_uart')
+  if (role === 'atmega_uart') return t('serial.role.atmega_uart')
   if (role === 'aux_serial') return t('serial.role.aux_serial')
   return role
 }
@@ -808,7 +795,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onWindowKeyDown)
   window.removeEventListener('keyup', onWindowKeyUp)
   if (reconnectTimer) clearTimeout(reconnectTimer)
-  stopUpdatePolling()
   clearUpdateCountdown()
   wsAllowReconnect = false
   try {
@@ -1111,6 +1097,21 @@ const statusColor = computed(() => {
                 {{ t('conn.reconnectWs') }}
               </button>
               <p class="mt-2 text-xs text-pve-muted">{{ t('conn.hint') }}</p>
+            </section>
+
+            <section class="mb-6">
+              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('update.title') }}</h3>
+              <button
+                type="button"
+                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs font-semibold text-pve-text hover:bg-pve-header disabled:opacity-50"
+                :disabled="updateCheckBusy"
+                @click="checkUpdateFromSettings"
+              >
+                {{ updateCheckBusy ? t('update.checking') : t('update.checkNow') }}
+              </button>
+              <p v-if="updateStatus?.enabled" class="mt-2 font-mono text-[11px] text-pve-accent2">{{ updateShasLine }}</p>
+              <p v-if="updateCheckMessage" class="mt-2 text-xs leading-relaxed text-pve-muted">{{ updateCheckMessage }}</p>
+              <p v-if="updateStatus?.git_error" class="mt-2 font-mono text-[11px] text-pve-warn">{{ t('update.gitErr') }} {{ updateStatus.git_error }}</p>
             </section>
 
             <section class="mb-6">

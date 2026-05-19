@@ -2,6 +2,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/creack/pty"
@@ -27,9 +29,11 @@ import (
 // 作用：组合配置和鉴权模块，并注册全部 HTTP 路由。
 // ==================================================
 type Server struct {
-	cfg  config.Config
-	auth *auth.Store
-	mux  *http.ServeMux
+	cfg        config.Config
+	auth       *auth.Store
+	mux        *http.ServeMux
+	updateMu   sync.Mutex
+	updateBusy bool
 }
 
 func New(cfg config.Config, authStore *auth.Store) *Server {
@@ -230,7 +234,7 @@ func (s *Server) handleUpdatesStatus(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAuth(w, r); !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"available": false, "message": "Go API layer is running"})
+	writeJSON(w, http.StatusOK, s.buildUpdateStatus(r.Context()))
 }
 
 func (s *Server) handleUpdatesApply(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +244,98 @@ func (s *Server) handleUpdatesApply(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAuth(w, r); !ok {
 		return
 	}
-	jsonError(w, http.StatusBadRequest, "no update available")
+
+	s.updateMu.Lock()
+	if s.updateBusy {
+		s.updateMu.Unlock()
+		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "update busy"})
+		return
+	}
+	s.updateBusy = true
+	s.updateMu.Unlock()
+	defer func() {
+		s.updateMu.Lock()
+		s.updateBusy = false
+		s.updateMu.Unlock()
+	}()
+
+	if _, err := os.Stat(s.cfg.UpdateScript); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "update script unavailable", "output": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "bash", s.cfg.UpdateScript)
+	cmd.Dir = s.cfg.RepoRoot
+	cmd.Env = append(os.Environ(), "AMSEOKBOT_REPO_DIR="+s.cfg.RepoRoot)
+	output, err := cmd.CombinedOutput()
+	exitCode := 0
+	if err != nil {
+		exitCode = 1
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": err == nil, "exit_code": exitCode, "output": string(output)})
+}
+
+func (s *Server) buildUpdateStatus(ctx context.Context) map[string]any {
+	status := map[string]any{"enabled": false, "update_available": false}
+	if s.cfg.RepoRoot == "" {
+		status["reason"] = "repo root not configured"
+		return status
+	}
+	if _, err := os.Stat(filepath.Join(s.cfg.RepoRoot, ".git")); err != nil {
+		status["reason"] = "repo root is not a git checkout"
+		status["git_error"] = err.Error()
+		return status
+	}
+	status["enabled"] = true
+	branch, err := s.gitOutput(ctx, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		status["git_error"] = err.Error()
+		return status
+	}
+	branch = strings.TrimSpace(branch)
+	status["branch"] = branch
+	localSHA, err := s.gitOutput(ctx, "rev-parse", "HEAD")
+	if err != nil {
+		status["git_error"] = err.Error()
+		return status
+	}
+	localSHA = strings.TrimSpace(localSHA)
+	status["local_sha"] = localSHA
+	if _, err := s.gitOutput(ctx, "fetch", "origin", branch); err != nil {
+		status["git_error"] = err.Error()
+		return status
+	}
+	remoteSHA, err := s.gitOutput(ctx, "rev-parse", "origin/"+branch)
+	if err != nil {
+		status["git_error"] = err.Error()
+		return status
+	}
+	remoteSHA = strings.TrimSpace(remoteSHA)
+	status["remote_sha"] = remoteSHA
+	status["update_available"] = localSHA != remoteSHA
+	if body, err := os.ReadFile(filepath.Join(s.cfg.RepoRoot, "CHANGELOG.md")); err == nil {
+		status["changelog"] = string(body)
+		status["changelog_ok"] = true
+	} else {
+		status["changelog_error"] = err.Error()
+	}
+	return status
+}
+
+func (s *Server) gitOutput(ctx context.Context, args ...string) (string, error) {
+	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(cmdCtx, "git", args...)
+	cmd.Dir = s.cfg.RepoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(string(output)))
+	}
+	return string(output), nil
 }
 
 // ==================== WebSocket 接口 ====================

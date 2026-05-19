@@ -34,7 +34,7 @@ const EDGES: EdgeDef[] = [
 
 //--------//
 // 模块：布局 — 计算各节点坐标（浏览器/HostPC/ROS/外设）
-/** 分层自动布局：上层 = 浏览器 / 上位机 / ROS；中层 = 流与配置；底层 = 摄像头 / 视觉 / ESP32 */
+/** 分层自动布局：上层 = 浏览器 / 上位机 / ROS；中层 = 流与配置；底层 = 摄像头 / 视觉 / ATmega */
 function computeAutoLayout(): NodeDef[] {
   const topY = 28
   const midY = 132
