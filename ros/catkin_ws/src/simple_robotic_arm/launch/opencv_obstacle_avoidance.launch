@@ -4,7 +4,7 @@
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
   <arg name="publish_debug_image" default="true"/>
 
-  <node pkg="simple_robotic_arm" type="opencv_obstacle_avoidance.py" name="opencv_obstacle_avoidance" output="screen">
+  <node pkg="simple_robotic_arm" type="opencv_obstacle_avoidance" name="opencv_obstacle_avoidance" output="screen">
     <param name="image_topic" value="$(arg image_topic)"/>
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
     <param name="publish_debug_image" value="$(arg publish_debug_image)"/>

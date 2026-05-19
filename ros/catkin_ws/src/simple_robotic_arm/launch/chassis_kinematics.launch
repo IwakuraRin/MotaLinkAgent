@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <!--
   三全向轮底盘运动学启动文件：
-  启动 chassis_kinematics.py，把 /cmd_vel 转换为三颗 85mm 全向轮目标角速度。
+  启动 chassis_kinematics，把 /cmd_vel 转换为三颗 85mm 全向轮目标角速度。
   几何参数来自 2026-05-10 Shapr3D STEP 底盘文件。
 -->
 <launch>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
   <arg name="wheel_omega_topic" default="/chassis/wheel_omega"/>
-  <arg name="serial_tx_topic" default="/esp32_serial_bridge/tx"/>
+  <arg name="serial_tx_topic" default="/atmega_serial_bridge/tx"/>
   <arg name="publish_serial" default="true"/>
 
   <arg name="wheel_base_radius_m" default="0.1337147"/>
@@ -19,7 +19,7 @@
 
   <node
     pkg="simple_robotic_arm"
-    type="chassis_kinematics.py"
+    type="chassis_kinematics"
     name="chassis_kinematics"
     output="screen"
   >
