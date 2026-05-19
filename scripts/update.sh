@@ -3,8 +3,9 @@
 
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
+[[ -f "${SCRIPT_DIR}/lib/common.sh" ]] || { printf '[AmseokBot][ERROR] 缺少脚本库：%s\n' "${SCRIPT_DIR}/lib/common.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/common.sh"
 
 FORCE=0
@@ -20,6 +21,7 @@ done
 # ======================================================
 update_from_git() {
   cd "${AMSEOKBOT_REPO_DIR}"
+  require_git_repo
   have_cmd git || die "缺少 git"
   local branch local_sha remote_sha
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -51,14 +53,14 @@ update_from_git() {
 # 作用：重建产物并重启后台服务；systemd 模式下重启 systemd 服务。
 # ==================================================
 restart_service() {
-  "${SCRIPT_DIR}/build.sh"
+  "${AMSEOKBOT_REPO_DIR}/scripts/build.sh"
   if have_cmd systemctl && systemctl list-unit-files amseokbot-milo.service >/dev/null 2>&1; then
     log "重启 systemd 服务：amseokbot-milo.service"
     as_root systemctl restart amseokbot-milo.service
     return
   fi
-  "${SCRIPT_DIR}/stop.sh" || true
-  "${SCRIPT_DIR}/start.sh"
+  "${AMSEOKBOT_REPO_DIR}/scripts/stop.sh" || true
+  "${AMSEOKBOT_REPO_DIR}/scripts/start.sh"
 }
 
 main() {

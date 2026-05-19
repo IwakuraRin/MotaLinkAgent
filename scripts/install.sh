@@ -3,8 +3,9 @@
 
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
+[[ -f "${SCRIPT_DIR}/lib/common.sh" ]] || { printf '[AmseokBot][ERROR] 缺少脚本库：%s\n' "${SCRIPT_DIR}/lib/common.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/common.sh"
 
 SKIP_APT=0
@@ -65,7 +66,7 @@ write_env_file() {
 
   local password tmp
   password="$(random_password)"
-  tmp="$(mktemp)"
+  tmp="$(make_temp_file)"
   cat >"${tmp}" <<EOF_ENV
 # 作用：AmseokBot-Milo 本机运行配置。此文件含首次登录密码，不要提交到 Git。
 AMSEOKBOT_REPO_DIR=${AMSEOKBOT_REPO_DIR}

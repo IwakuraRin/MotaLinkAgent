@@ -3,8 +3,9 @@
 
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
+[[ -f "${SCRIPT_DIR}/lib/common.sh" ]] || { printf '[AmseokBot][ERROR] 缺少脚本库：%s\n' "${SCRIPT_DIR}/lib/common.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/common.sh"
 
 FOREGROUND=0
@@ -21,7 +22,7 @@ done
 ensure_built() {
   if [[ ! -x "${AMSEOKBOT_API_BIN}" || ! -x "${AMSEOKBOT_CONTROL_CORE}" || ! -f "${AMSEOKBOT_STATIC_DIR}/index.html" ]]; then
     log "缺少构建产物，开始自动构建"
-    "${SCRIPT_DIR}/build.sh"
+    "${AMSEOKBOT_REPO_DIR}/scripts/build.sh"
   fi
 }
 

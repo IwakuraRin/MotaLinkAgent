@@ -3,8 +3,9 @@
 
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
+[[ -f "${SCRIPT_DIR}/lib/common.sh" ]] || { printf '[AmseokBot][ERROR] 缺少脚本库：%s\n' "${SCRIPT_DIR}/lib/common.sh" >&2; exit 1; }
 source "${SCRIPT_DIR}/lib/common.sh"
 
 SERVICE_FILE="/etc/systemd/system/amseokbot-milo.service"
@@ -16,7 +17,7 @@ write_service_file() {
   have_cmd systemctl || die "当前系统没有 systemd"
   ensure_runtime_dirs
   local tmp
-  tmp="$(mktemp)"
+  tmp="$(make_temp_file)"
   cat >"${tmp}" <<EOF_SERVICE
 [Unit]
 Description=AmseokBot-Milo local robot software

@@ -1,13 +1,44 @@
 #!/usr/bin/env bash
-# 作用：提供 AmseokBot-Milo 部署脚本共用的路径、日志、权限和运行时目录函数。
+# 作用：提供 AmseokBot-Milo 部署脚本共用的路径、日志、权限、仓库定位和运行时目录函数。
 
 set -Eeuo pipefail
 
-# ==================== 路径配置 ====================
-# 作用：计算仓库根目录，并提供可被 /etc/amseokbot/milo.env 覆盖的默认路径。
+# ==================== 基础工具 ====================
+# 作用：在路径定位前提供最小工具函数，避免脚本加载顺序依赖。
 # ==================================================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR_DEFAULT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+have_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# ==================== 路径配置 ====================
+# 作用：从脚本真实位置向上定位项目根目录，不依赖用户名、home 目录或固定安装路径。
+# ==================================================
+COMMON_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS_DIR_DEFAULT="$(cd -P "${COMMON_DIR}/.." && pwd)"
+
+find_repo_root() {
+  local candidate="${1:-${SCRIPTS_DIR_DEFAULT}}"
+  if have_cmd git; then
+    local git_root
+    git_root="$(git -C "${candidate}" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [[ -n "${git_root}" && -d "${git_root}/scripts" ]]; then
+      printf '%s\n' "${git_root}"
+      return
+    fi
+  fi
+
+  while [[ "${candidate}" != "/" ]]; do
+    if [[ -d "${candidate}/scripts" && -d "${candidate}/backend" && -d "${candidate}/backend-go" && -d "${candidate}/frontend" ]]; then
+      printf '%s\n' "${candidate}"
+      return
+    fi
+    candidate="$(dirname "${candidate}")"
+  done
+
+  printf '%s\n' "$(cd -P "${SCRIPTS_DIR_DEFAULT}/.." && pwd)"
+}
+
+REPO_DIR_DEFAULT="$(find_repo_root "${SCRIPTS_DIR_DEFAULT}")"
 ENV_FILE_DEFAULT="/etc/amseokbot/milo.env"
 
 AMSEOKBOT_REPO_DIR="${AMSEOKBOT_REPO_DIR:-${REPO_DIR_DEFAULT}}"
@@ -19,6 +50,9 @@ if [[ -f "${AMSEOKBOT_ENV_FILE}" ]]; then
 fi
 
 AMSEOKBOT_REPO_DIR="${AMSEOKBOT_REPO_DIR:-${REPO_DIR_DEFAULT}}"
+if [[ ! -d "${AMSEOKBOT_REPO_DIR}/scripts" && -d "${REPO_DIR_DEFAULT}/scripts" ]]; then
+  AMSEOKBOT_REPO_DIR="${REPO_DIR_DEFAULT}"
+fi
 AMSEOKBOT_API_ADDR="${AMSEOKBOT_API_ADDR:-0.0.0.0:8080}"
 AMSEOKBOT_CONFIG_DIR="${AMSEOKBOT_CONFIG_DIR:-${AMSEOKBOT_REPO_DIR}/.amseokbot/etc}"
 AMSEOKBOT_DATA_DIR="${AMSEOKBOT_DATA_DIR:-${AMSEOKBOT_REPO_DIR}/.amseokbot/data}"
@@ -31,6 +65,8 @@ AMSEOKBOT_API_BIN="${AMSEOKBOT_API_BIN:-${AMSEOKBOT_REPO_DIR}/backend-go/hostpc-
 AMSEOKBOT_PID_FILE="${AMSEOKBOT_PID_FILE:-${AMSEOKBOT_DATA_DIR}/hostpc-api.pid}"
 AMSEOKBOT_API_LOG="${AMSEOKBOT_API_LOG:-${AMSEOKBOT_LOG_DIR}/hostpc-api.log}"
 
+SCRIPT_DIR="${SCRIPTS_DIR_DEFAULT}"
+
 # ==================== 输出工具 ====================
 # 作用：统一脚本日志格式，失败时给出明确错误。
 # ==================================================
@@ -41,10 +77,6 @@ log() {
 die() {
   printf '[AmseokBot][ERROR] %s\n' "$*" >&2
   exit 1
-}
-
-have_cmd() {
-  command -v "$1" >/dev/null 2>&1
 }
 
 # ==================== 权限工具 ====================
@@ -59,10 +91,15 @@ as_root() {
 }
 
 require_repo() {
-  [[ -d "${AMSEOKBOT_REPO_DIR}/.git" ]] || die "没有找到 Git 仓库：${AMSEOKBOT_REPO_DIR}"
+  [[ -d "${AMSEOKBOT_REPO_DIR}" ]] || die "项目目录不存在：${AMSEOKBOT_REPO_DIR}"
   [[ -d "${AMSEOKBOT_REPO_DIR}/backend" ]] || die "缺少 backend 目录"
   [[ -d "${AMSEOKBOT_REPO_DIR}/backend-go" ]] || die "缺少 backend-go 目录"
   [[ -d "${AMSEOKBOT_REPO_DIR}/frontend" ]] || die "缺少 frontend 目录"
+  [[ -d "${AMSEOKBOT_REPO_DIR}/scripts" ]] || die "缺少 scripts 目录"
+}
+
+require_git_repo() {
+  [[ -d "${AMSEOKBOT_REPO_DIR}/.git" ]] || die "没有找到 Git 仓库：${AMSEOKBOT_REPO_DIR}；自动更新功能需要通过 git clone 部署"
 }
 
 ensure_runtime_dirs() {
@@ -74,5 +111,11 @@ ensure_runtime_dirs() {
 }
 
 api_args() {
-  printf '%s\n' -addr "${AMSEOKBOT_API_ADDR}" -static "${AMSEOKBOT_STATIC_DIR}" -settings "${AMSEOKBOT_SETTINGS_FILE}" -users "${AMSEOKBOT_USERS_FILE}" -control-core "${AMSEOKBOT_CONTROL_CORE}"
+  printf '%s\n' -addr "${AMSEOKBOT_API_ADDR}" -static "${AMSEOKBOT_STATIC_DIR}" -settings "${AMSEOKBOT_SETTINGS_FILE}" -users "${AMSEOKBOT_USERS_FILE}" -control-core "${AMSEOKBOT_CONTROL_CORE}" -repo-root "${AMSEOKBOT_REPO_DIR}" -update-script "${AMSEOKBOT_REPO_DIR}/scripts/update.sh"
+}
+
+make_temp_file() {
+  local base="${AMSEOKBOT_DATA_DIR:-${AMSEOKBOT_REPO_DIR}/.amseokbot/data}"
+  install -d -m 0755 "${base}" 2>/dev/null || true
+  TMPDIR="${base}" mktemp
 }
