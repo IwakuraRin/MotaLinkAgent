@@ -1,60 +1,152 @@
-# AmseokBot Milo
+<h1 align="center">AmseokBot-Milo</h1>
 
-AmseokBot Milo 是机器人上位机软件仓库，按 C 控制核心、Go API 层、ROS 能力层和前端界面分开维护。
+<p align="center">
+  <strong>A ROS 1 based home companion robot software stack.</strong>
+</p>
 
-## 分层架构
+<p align="center">
+  <a href="#english">English</a> |
+  <a href="#中文">中文</a> |
+  <a href="#한국어">한국어</a>
+</p>
 
-```text
-frontend / mobile app
-        |
-        | HTTP / WebSocket
-        v
-MasterComputer/backend-go
-        |
-        | local process / future Unix socket
-        v
-MasterComputer/backend
-        |
-        | serial protocol / low latency control
-        v
-SlaveDevice/ATmega2560 / motor drivers
+<p align="center">
+  <img src="assets/readme/amseokbot-milo.jpg" alt="AmseokBot Milo robot" width="820">
+</p>
 
-MasterComputer/ros
-        |
-        | topics / launch / perception / kinematics
-        v
-camera / YOLO / navigation / sensor nodes
+## English
+
+AmseokBot-Milo is a software repository for the robot master computer and slave controller. It is designed for a home companion robot built on ROS 1, with vision perception, obstacle avoidance, robot control, and a web based administration interface.
+
+The system is split into two main parts:
+
+- `MasterComputer` is the master computer software repository. It contains the C control core, Go API layer, ROS capability layer, and frontend interface.
+- `SlaveDevice` is the slave controller software repository. It mainly contains the ATmega based lower-level controller program written in C++.
+
+### What It Does
+
+AmseokBot-Milo focuses on a practical robot software stack for a small team:
+
+- Real-time robot control through a low-latency C control core.
+- HTTP/WebSocket API through Go for frontend, mobile app, and local tools.
+- ROS 1 nodes for camera, YOLO perception, obstacle avoidance, kinematics, and robot experiments.
+- Web administration interface for real-time image display, SSH terminal access, file management, settings, and software update operations.
+- ATmega based slave firmware for motor execution, serial communication, and hardware control.
+
+### Admin Interface
+
+The web administration interface is intended to be the main operation panel for the robot. It provides:
+
+- Real-time camera and YOLO debug stream display.
+- Built-in SSH terminal for maintenance and debugging.
+- File management for browsing, uploading, downloading, moving, copying, and deleting files.
+- Robot settings and update actions from the browser.
+- LAN access through the robot master computer service.
+
+### Project Architecture
+
+```mermaid
+flowchart LR
+  App["Mobile App / Web Frontend"] -->|HTTP / WebSocket| Go["Go API Layer\nMasterComputer/backend-go"]
+  Go -->|Local Command / Process Call| C["C Control Core\nMasterComputer/backend"]
+  C -->|Serial Protocol| MCU["ATmega Slave Controller\nSlaveDevice"]
+  MCU --> Motor["Motors / Drivers / Sensors"]
+
+  ROS["ROS 1 Capability Layer\nMasterComputer/ros"] --> Camera["Camera"]
+  ROS --> YOLO["YOLO Perception"]
+  ROS --> Motion["Kinematics / Navigation"]
+  ROS --> Stream["web_video_server\nYOLO Debug Stream"]
+
+  Go --> ROS
+  Stream --> App
 ```
 
-## 目录职责
+### Directory Map
 
-| 目录 | 职责 |
-|------|------|
-| `SlaveDevice/ATmega2560/` | 下位机固件：串口通信、电机执行、传感器采集和实时控制 |
-| `MasterComputer/backend/` | C 语言控制核心：电机控制、串口协议、底盘运动、机械臂控制、安全限幅、本地命令接口 |
-| `MasterComputer/backend-go/` | Go API 层：HTTP API、登录鉴权、前端/手机通信、配置管理、文件管理、调用 C 控制核心 |
-| `MasterComputer/ros/` | ROS 层：运动学、传感器节点、相机、YOLO、导航和机器人实验节点 |
-| `MasterComputer/frontend/` | 前端界面，通过 Go API 控制机器人和查看状态 |
-| `MasterComputer/database/` | 可选数据库实验配置 |
-| `MasterComputer/deploy/` | 后续 deb/systemd/镜像部署文件 |
-| `MasterComputer/systeminfo/` | 可选系统信息小工具 |
+```mermaid
+flowchart TB
+  Root["AmseokBot-Milo"]
 
-## 构建控制核心
+  Root --> Master["MasterComputer\nRobot master computer"]
+  Root --> Slave["SlaveDevice\nATmega slave device"]
+  Root --> Assets["assets/readme\nREADME images"]
+
+  Master --> Backend["backend\nC control core"]
+  Master --> API["backend-go\nGo API service"]
+  Master --> Frontend["frontend\nWeb admin interface"]
+  Master --> ROSDir["ros\nROS 1 nodes and launch files"]
+  Master --> Scripts["scripts\nBuild, start, stop, update"]
+  Master --> Deploy["deploy\nService and packaging files"]
+  Master --> Database["database\nOptional database configuration"]
+
+  Slave --> Firmware["src\nATmega C++ firmware"]
+  Slave --> PlatformIO["platformio.ini\nBuild configuration"]
+```
+
+### Layer Responsibilities
+
+| Layer | Path | Responsibility |
+| --- | --- | --- |
+| C control core | `MasterComputer/backend/` | Motor control, serial protocol, chassis motion, arm control, safety limits, local command interface. |
+| Go API layer | `MasterComputer/backend-go/` | HTTP API, authentication, frontend/mobile communication, settings, file management, and calling the C control core. |
+| ROS capability layer | `MasterComputer/ros/` | Kinematics, camera nodes, YOLO perception, obstacle avoidance, navigation experiments, and video streaming. |
+| Frontend | `MasterComputer/frontend/` | Browser based robot administration interface. |
+| Slave firmware | `SlaveDevice/` | ATmega firmware for hardware execution and serial communication. |
+
+### Quick Start
+
+```bash
+cd AmseokBot-Milo
+bash MasterComputer/scripts/start.sh
+```
+
+After startup, open the robot master computer address in a browser:
+
+```text
+http://<robot-ip>:8080/
+```
+
+The YOLO debug stream is served by ROS web video server:
+
+```text
+http://<robot-ip>:8081/stream?topic=/obstacle_detector/debug
+```
+
+### Build Manually
 
 ```bash
 cd MasterComputer/backend
 make
-./amseokbot-control-core health
-```
 
-## 验证 Go API
-
-```bash
-cd MasterComputer/backend-go
+cd ../backend-go
 go test ./...
-go run ./cmd/hostpc-api -control-core ../backend/amseokbot-control-core
+go build -o hostpc-api ./cmd/hostpc-api
+
+cd ../frontend
+pnpm install
+pnpm run build
 ```
 
-## 运行数据原则
+### Runtime Data Policy
 
-真实密钥、用户数据库和机器人本机数据不提交到 Git。以后打包成 deb 时，由安装脚本或首次启动流程生成到 `/etc/amseokbot/` 和 `/var/lib/amseokbot/`。
+Secrets, local user databases, generated runtime data, build outputs, and robot-local state are not committed to Git. Production installation should generate runtime data under system locations such as `/etc/amseokbot/` and `/var/lib/amseokbot/` during installation or first startup.
+
+## 中文
+
+AmseokBot Milo 是机器人上位机与下位机软件仓库。
+
+`MasterComputer` 为上位机仓库，包含 C 控制核心、Go API 层、ROS 能力层和前端界面。
+
+`SlaveDevice` 为下位机仓库，主要是基于 ATmega 的下位机 C++ 程序。
+
+AmseokBot-Milo 是一个基于 ROS 1 开发的家用陪伴型机器人软件栈，集成图像识别、YOLO 调试画面、自动避障、底盘运动控制、机械臂控制、文件管理、SSH 维护终端和浏览器后台管理界面。
+
+后台管理界面主要用于机器人本机维护和调试，包括实时图像显示、YOLO 带框画面查看、SSH 终端、文件上传下载、复制移动删除、系统设置和软件更新等功能。
+
+## 한국어
+
+AmseokBot-Milo는 ROS 1 기반 가정용 동반 로봇을 위한 마스터 컴퓨터 및 하위 제어기 소프트웨어 저장소입니다.
+
+`MasterComputer`에는 C 제어 코어, Go API 계층, ROS 기능 계층, 웹 프론트엔드가 포함됩니다.
+
+`SlaveDevice`에는 ATmega 기반 하위 제어기 C++ 펌웨어가 포함됩니다.
