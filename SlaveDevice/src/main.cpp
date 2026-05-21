@@ -25,6 +25,7 @@ const uint8_t kSR04TriggerPin = 22;
 const uint8_t kSR04EchoPin = 23;
 const uint8_t kMotorDriverAddress = 0x10;
 const uint32_t kMotorDriverIicClockHz = 100000UL;
+const uint16_t kObstacleHardStopDistanceMm = 160;
 const uint16_t kObstacleStopDistanceMm = 260;
 const uint16_t kObstacleClearDistanceMm = 360;
 const uint8_t kObstacleStopSamples = 2;
@@ -104,10 +105,12 @@ static void sendRangeTelemetry(uint16_t rawDistanceMm) {
     snprintf(
         replyBuffer,
         sizeof(replyBuffer),
-        "TEL SR04 mm=%u raw=%u blocked=%u stop=%u clear=%u",
+        "TEL SR04 mm=%u raw=%u median=%u blocked=%u hard=%u stop=%u clear=%u",
         obstacleSafety.filteredDistanceMm(),
         rawDistanceMm,
+        obstacleSafety.medianDistanceMm(),
         obstacleSafety.blocked() ? 1 : 0,
+        obstacleSafety.hardStopDistanceMm(),
         obstacleSafety.stopDistanceMm(),
         obstacleSafety.clearDistanceMm());
     uartHostPC.sendLine(replyBuffer);
@@ -236,11 +239,13 @@ static void handleSafetyCommand() {
     snprintf(
         replyBuffer,
         sizeof(replyBuffer),
-        "OK SAFETY stop=%u clear=%u blocked=%u mm=%u",
+        "OK SAFETY hard=%u stop=%u clear=%u blocked=%u mm=%u median=%u",
+        obstacleSafety.hardStopDistanceMm(),
         obstacleSafety.stopDistanceMm(),
         obstacleSafety.clearDistanceMm(),
         obstacleSafety.blocked() ? 1 : 0,
-        obstacleSafety.filteredDistanceMm());
+        obstacleSafety.filteredDistanceMm(),
+        obstacleSafety.medianDistanceMm());
     uartHostPC.sendLine(replyBuffer);
 }
 
@@ -295,7 +300,7 @@ static void handleHostCommand(char* line) {
 void setup() {
     uartHostPC.init(kHostBaudRate);
     frontRangeSensor.init(kSR04TriggerPin, kSR04EchoPin);
-    obstacleSafety.configure(kObstacleStopDistanceMm, kObstacleClearDistanceMm, kObstacleStopSamples, kObstacleClearSamples);
+    obstacleSafety.configure(kObstacleStopDistanceMm, kObstacleClearDistanceMm, kObstacleStopSamples, kObstacleClearSamples, kObstacleHardStopDistanceMm);
     motorDriver.init(kMotorDriverAddress, kMotorDriverIicClockHz);
     motorDriver.stop();
     uartHostPC.sendLine(F("OK BOOT AmseokBot-Milo SlaveDevice"));
