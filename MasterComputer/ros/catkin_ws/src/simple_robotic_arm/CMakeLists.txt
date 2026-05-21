@@ -10,12 +10,13 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   geometry_msgs
+  nav_msgs
   cv_bridge
 )
 find_package(OpenCV REQUIRED)
 
 catkin_package(
-  CATKIN_DEPENDS roscpp roslib std_msgs sensor_msgs geometry_msgs cv_bridge
+  CATKIN_DEPENDS roscpp roslib std_msgs sensor_msgs geometry_msgs nav_msgs cv_bridge
 )
 
 include_directories(
@@ -32,6 +33,7 @@ set(AMSEOKBOT_ROS_NODES
   chassis_kinematics
   line_follow_vision
   opencv_obstacle_avoidance
+  single_camera_ultrasonic_mapper
   yolo_obstacle_detector
 )
 

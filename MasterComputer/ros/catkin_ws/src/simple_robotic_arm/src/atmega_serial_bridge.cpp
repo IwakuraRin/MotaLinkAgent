@@ -2,13 +2,13 @@
 |--------------------------------------------------------------------------
 | ATmega 串口桥接节点
 |--------------------------------------------------------------------------
-| 负责把 ROS 文本命令写入 ATmega USB-UART，并把 ATmega 返回的文本行发布到 ROS。
-| 面向 ATmega 控制板命名和实现。
+| 负责把 ROS 文本命令写入 ATmega USB-UART，并把下位机返回的距离、安全事件发布到 ROS。
 |--------------------------------------------------------------------------
 */
 
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <fcntl.h>
 #include <string>
@@ -17,7 +17,9 @@
 #include <termios.h>
 
 #include <ros/ros.h>
+#include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
+#include <std_msgs/UInt16.h>
 
 namespace simple_robotic_arm {
 
@@ -25,7 +27,7 @@ namespace simple_robotic_arm {
 |--------------------------------------------------------------------------
 | 串口底层工具
 |--------------------------------------------------------------------------
-| 使用 Linux termios 打开、配置、读写 USB-UART，避免依赖 Python pyserial。
+| 使用 Linux termios 打开、配置、读写 USB-UART，并保证一行命令完整写入。
 |--------------------------------------------------------------------------
 */
 speed_t baudToTermios(int baud) {
@@ -92,8 +94,18 @@ class SerialPort {
     if (fd_ < 0) {
       return false;
     }
-    const ssize_t written = ::write(fd_, line.data(), line.size());
-    if (written < 0) {
+
+    std::size_t offset = 0;
+    while (offset < line.size()) {
+      const ssize_t written = ::write(fd_, line.data() + offset, line.size() - offset);
+      if (written > 0) {
+        offset += static_cast<std::size_t>(written);
+        continue;
+      }
+      if (written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        continue;
+      }
       ROS_WARN("ATmega 串口写失败: %s", std::strerror(errno));
       return false;
     }
@@ -114,9 +126,48 @@ class SerialPort {
 
 /*
 |--------------------------------------------------------------------------
+| ATmega 行协议解析
+|--------------------------------------------------------------------------
+| 解析 TEL SR04 / EVT OBSTACLE / ERR MOTOR obstacle，输出距离和急停状态话题。
+|--------------------------------------------------------------------------
+*/
+bool parseKeyUInt(const std::string& line, const std::string& key, uint32_t& value) {
+  const std::size_t begin = line.find(key);
+  if (begin == std::string::npos) {
+    return false;
+  }
+  const std::size_t number_begin = begin + key.size();
+  std::size_t number_end = number_begin;
+  while (number_end < line.size() && line[number_end] >= 0 && line[number_end] <= 9) {
+    number_end += 1;
+  }
+  if (number_end == number_begin) {
+    return false;
+  }
+  try {
+    value = static_cast<uint32_t>(std::stoul(line.substr(number_begin, number_end - number_begin)));
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+bool lineMeansObstacleStop(const std::string& line) {
+  return line.find("EVT OBSTACLE STOP") != std::string::npos ||
+         line.find("ERR MOTOR obstacle") != std::string::npos ||
+         line.find("blocked=1") != std::string::npos;
+}
+
+bool lineMeansObstacleClear(const std::string& line) {
+  return line.find("EVT OBSTACLE CLEAR") != std::string::npos ||
+         line.find("blocked=0") != std::string::npos;
+}
+
+/*
+|--------------------------------------------------------------------------
 | ROS 串口桥节点
 |--------------------------------------------------------------------------
-| 订阅 ~tx 写串口，读取串口行后发布 ~rx，供 ATmega 固件联调和底盘控制使用。
+| 订阅 ~tx 写串口，读取串口行后发布原始行、前方距离和本地急停状态。
 |--------------------------------------------------------------------------
 */
 class AtmegaSerialBridgeNode {
@@ -125,6 +176,9 @@ class AtmegaSerialBridgeNode {
     private_nh_.param<std::string>("port", port_, "/dev/ttyUSB0");
     private_nh_.param("baud", baud_, 115200);
     private_nh_.param("append_newline_on_tx", append_newline_, true);
+    private_nh_.param<std::string>("front_range_topic", front_range_topic_, "/safety/front_range_mm");
+    private_nh_.param<std::string>("obstacle_stop_topic", obstacle_stop_topic_, "/safety/obstacle_stop");
+    private_nh_.param<std::string>("safety_event_topic", safety_event_topic_, "/safety/events");
 
     if (!serial_.openPort(port_, baud_)) {
       ros::shutdown();
@@ -132,11 +186,14 @@ class AtmegaSerialBridgeNode {
     }
 
     rx_pub_ = private_nh_.advertise<std_msgs::String>("rx", 100);
+    range_pub_ = nh_.advertise<std_msgs::UInt16>(front_range_topic_, 20);
+    obstacle_pub_ = nh_.advertise<std_msgs::Bool>(obstacle_stop_topic_, 20, true);
+    safety_event_pub_ = nh_.advertise<std_msgs::String>(safety_event_topic_, 50);
     tx_sub_ = private_nh_.subscribe("tx", 50, &AtmegaSerialBridgeNode::handleTx, this);
     running_.store(true);
     read_thread_ = std::thread(&AtmegaSerialBridgeNode::readLoop, this);
 
-    ROS_INFO("atmega_serial_bridge: %s @ %d, topics ~tx ~rx", port_.c_str(), baud_);
+    ROS_INFO("atmega_serial_bridge: %s @ %d, range=%s obstacle=%s", port_.c_str(), baud_, front_range_topic_.c_str(), obstacle_stop_topic_.c_str());
   }
 
   ~AtmegaSerialBridgeNode() {
@@ -149,8 +206,8 @@ class AtmegaSerialBridgeNode {
  private:
   void handleTx(const std_msgs::String::ConstPtr& msg) {
     std::string data = msg->data;
-    if (append_newline_ && (data.empty() || data.back() != '\n')) {
-      data.push_back('\n');
+    if (append_newline_ && (data.empty() || data.back() != n)) {
+      data.push_back(n);
     }
     serial_.writeLine(data);
   }
@@ -164,11 +221,13 @@ class AtmegaSerialBridgeNode {
         rate.sleep();
         continue;
       }
-      if (byte == '\n') {
+      if (byte == n) {
         publishLine(line);
         line.clear();
-      } else if (byte != '\r') {
+      } else if (byte != r && line.size() < 160) {
         line.push_back(byte);
+      } else if (line.size() >= 160) {
+        line.clear();
       }
     }
   }
@@ -177,18 +236,41 @@ class AtmegaSerialBridgeNode {
     if (line.empty()) {
       return;
     }
-    std_msgs::String msg;
-    msg.data = line;
-    rx_pub_.publish(msg);
+
+    std_msgs::String raw_msg;
+    raw_msg.data = line;
+    rx_pub_.publish(raw_msg);
+
+    uint32_t mm = 0;
+    if (parseKeyUInt(line, "mm=", mm) && mm <= 65535U) {
+      std_msgs::UInt16 range_msg;
+      range_msg.data = static_cast<uint16_t>(mm);
+      range_pub_.publish(range_msg);
+    }
+
+    if (lineMeansObstacleStop(line) || lineMeansObstacleClear(line)) {
+      const bool blocked = lineMeansObstacleStop(line) && !lineMeansObstacleClear(line);
+      std_msgs::Bool obstacle_msg;
+      obstacle_msg.data = blocked;
+      obstacle_pub_.publish(obstacle_msg);
+      safety_event_pub_.publish(raw_msg);
+    }
   }
 
+  ros::NodeHandle nh_;
   ros::NodeHandle private_nh_;
   ros::Publisher rx_pub_;
+  ros::Publisher range_pub_;
+  ros::Publisher obstacle_pub_;
+  ros::Publisher safety_event_pub_;
   ros::Subscriber tx_sub_;
   SerialPort serial_;
   std::thread read_thread_;
   std::atomic<bool> running_ {false};
   std::string port_;
+  std::string front_range_topic_;
+  std::string obstacle_stop_topic_;
+  std::string safety_event_topic_;
   int baud_ = 115200;
   bool append_newline_ = true;
 };

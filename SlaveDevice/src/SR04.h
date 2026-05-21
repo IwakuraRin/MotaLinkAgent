@@ -1,4 +1,10 @@
-// 作用：封装 HC-SR04 超声波测距模块，提供毫米级整数距离读取，适合 ATmega2560 低内存环境。
+/*
+|--------------------------------------------------------------------------
+| HC-SR04 超声波测距模块
+|--------------------------------------------------------------------------
+| 封装 Trig/Echo 引脚和毫米级整数距离读取，为本地急停和上位机建图提供距离。
+|--------------------------------------------------------------------------
+*/
 #ifndef SR04_H
 #define SR04_H
 
@@ -14,7 +20,7 @@ public:
 
     SR04Sensor();
 
-    void init(uint8_t triggerPin, uint8_t echoPin, uint32_t timeoutUs = 25000UL);
+    void init(uint8_t triggerPin, uint8_t echoPin, uint32_t timeoutUs = 18000UL);
     uint16_t readDistanceMm() const;
 
 private:

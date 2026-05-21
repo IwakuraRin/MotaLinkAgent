@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- 作用：统一启动 AmseokBot 摄像头、YOLO 带框调试图和浏览器 MJPEG 推流。 -->
+  <!-- 作用：统一启动 AmseokBot 摄像头、YOLO 带框调试图、浏览器 MJPEG 推流和可选局部建图。 -->
 
   <!-- ==================== 摄像头输入 ==================== -->
   <!-- 作用：读取 HostPC 上的 USB 摄像头并发布 ROS 原始图像。 -->
@@ -27,6 +27,23 @@
   <arg name="web_video_port" default="8081"/>
   <arg name="web_video_address" default="0.0.0.0"/>
 
+  <!-- ==================== 单目 + 超声波建图 ==================== -->
+  <!-- 作用：需要 atmega_serial_bridge 发布 /safety/front_range_mm 后才能生成局部栅格图。 -->
+  <arg name="start_mapping" default="false"/>
+  <arg name="start_atmega_bridge" default="false"/>
+  <arg name="atmega_port" default="/dev/ttyUSB0"/>
+  <arg name="atmega_baud" default="115200"/>
+  <arg name="front_range_topic" default="/safety/front_range_mm"/>
+  <arg name="map_topic" default="/mapping/local_occupancy"/>
+
+  <group if="$(arg start_atmega_bridge)">
+    <include file="$(find simple_robotic_arm)/launch/atmega_serial_bridge.launch">
+      <arg name="port" value="$(arg atmega_port)"/>
+      <arg name="baud" value="$(arg atmega_baud)"/>
+      <arg name="front_range_topic" value="$(arg front_range_topic)"/>
+    </include>
+  </group>
+
   <include file="$(find simple_robotic_arm)/launch/usb_camera_web.launch">
     <arg name="video_device" value="$(arg video_device)"/>
     <arg name="image_width" value="$(arg image_width)"/>
@@ -49,4 +66,12 @@
     <arg name="output_width" value="$(arg output_width)"/>
     <arg name="process_every_n" value="$(arg process_every_n)"/>
   </include>
+
+  <group if="$(arg start_mapping)">
+    <include file="$(find simple_robotic_arm)/launch/single_camera_ultrasonic_mapper.launch">
+      <arg name="image_topic" value="$(arg image_topic)"/>
+      <arg name="front_range_topic" value="$(arg front_range_topic)"/>
+      <arg name="map_topic" value="$(arg map_topic)"/>
+    </include>
+  </group>
 </launch>

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 作用：启动单目摄像头 + HC-SR04 超声波局部建图节点。 -->
+  <arg name="image_topic" default="/usb_cam/image_raw"/>
+  <arg name="front_range_topic" default="/safety/front_range_mm"/>
+  <arg name="map_topic" default="/mapping/local_occupancy"/>
+  <arg name="map_frame" default="base_link"/>
+
+  <node pkg="simple_robotic_arm" type="single_camera_ultrasonic_mapper" name="single_camera_ultrasonic_mapper" output="screen">
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="front_range_topic" value="$(arg front_range_topic)"/>
+    <param name="map_topic" value="$(arg map_topic)"/>
+    <param name="map_frame" value="$(arg map_frame)"/>
+    <param name="resolution_m" value="0.05"/>
+    <param name="forward_length_m" value="3.0"/>
+    <param name="side_width_m" value="2.4"/>
+    <param name="camera_fov_deg" value="62.0"/>
+    <param name="min_range_mm" value="60"/>
+    <param name="max_range_mm" value="2500"/>
+    <param name="range_timeout_s" value="0.5"/>
+  </node>
+</launch>

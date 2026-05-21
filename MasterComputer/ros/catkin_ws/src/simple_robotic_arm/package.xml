@@ -57,12 +57,14 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>geometry_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>roslib</build_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>sensor_msgs</build_export_depend>
   <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>nav_msgs</build_export_depend>
   <build_export_depend>cv_bridge</build_export_depend>
   <build_export_depend>roslib</build_export_depend>
   <exec_depend>roscpp</exec_depend>
@@ -72,6 +74,7 @@
   <!-- ATmega 串口桥和视觉节点全部使用 C++/roscpp 实现。 -->
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <!-- usb_camera_web.launch: physical USB camera -> ROS Image -> MJPEG HTTP stream -->
   <exec_depend>usb_cam</exec_depend>
