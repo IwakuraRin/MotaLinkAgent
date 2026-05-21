@@ -7,10 +7,17 @@
 //   · 设置页：语言、摄像头 URL、串口绑定等
 //   · 模板：功能区、设置区、改密/更新弹窗
 //
-import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { t, locale, setLocale, type Locale } from './i18n'
-import DeskTerminal from './components/desktop/DeskTerminal.vue'
-import DeskFiles from './components/desktop/DeskFiles.vue'
+import AppLogin from './components/app/AppLogin.vue'
+import AppHeader from './components/app/AppHeader.vue'
+import PasswordNudgeBanner from './components/app/PasswordNudgeBanner.vue'
+import SideMenu from './components/app/SideMenu.vue'
+import FeatureWorkspace from './components/app/FeatureWorkspace.vue'
+import SettingsView from './components/app/SettingsView.vue'
+import PasswordDialog from './components/app/PasswordDialog.vue'
+import UpdateDialog from './components/app/UpdateDialog.vue'
+import { SERIAL_ROLE_KEYS, type MenuKey, type SerialDev, type SerialRoleKey, type UpdateStatusPayload } from './appTypes'
 
 const LS_CAMERA = 'omniroam.camera_url'
 const LS_KEYBOARD = 'omniroam.keyboard_enabled'
@@ -40,19 +47,6 @@ const pwdBusy = ref(false)
 const pwdNudgeDismissed = ref(
   typeof sessionStorage !== 'undefined' && sessionStorage.getItem(LS_PWD_DISMISS) === '1',
 )
-
-type UpdateStatusPayload = {
-  enabled: boolean
-  update_available?: boolean
-  local_sha?: string
-  remote_sha?: string
-  branch?: string
-  changelog?: string
-  changelog_ok?: boolean
-  changelog_error?: string
-  git_error?: string
-  reason?: string
-}
 
 const updateStatus = ref<UpdateStatusPayload | null>(null)
 const updateModal = ref<'off' | 'prompt' | 'countdown' | 'deploying'>('off')
@@ -203,16 +197,11 @@ type SerialDev = { path: string; target: string; kind: string }
 const SERIAL_ROLE_KEYS = ['atmega_uart', 'aux_serial'] as const
 type SerialRoleKey = (typeof SERIAL_ROLE_KEYS)[number]
 
-const camVideoRef = ref<HTMLVideoElement | null>(null)
-const camImgRef = ref<HTMLImageElement | null>(null)
-const workspaceScrollRef = ref<HTMLElement | null>(null)
-const terminalSectionRef = ref<HTMLElement | null>(null)
-const filesSectionRef = ref<HTMLElement | null>(null)
 const wsState = ref<'disconnected' | 'connecting' | 'open' | 'error'>('disconnected')
 const keysHeld = ref<Record<string, boolean>>({})
 const lastCmd = ref('')
 
-const activeMenu = ref<'function' | 'settings'>('function')
+const activeMenu = ref<MenuKey>('function')
 const settingsOpen = computed(() => activeMenu.value === 'settings')
 const settingsCameraDraft = ref('')
 const appliedCameraUrl = ref('')
@@ -298,12 +287,6 @@ let wsAllowReconnect = true
 // 模块：运行事件 — 保留内部调试入口，不再在前端界面显示日志。
 function ingestLog(line: string) {
   if (import.meta.env.DEV) console.debug('[AmseokBot]', line)
-}
-
-function scrollWorkspaceTo(section: 'terminal' | 'files') {
-  const target = section === 'terminal' ? terminalSectionRef.value : filesSectionRef.value
-  if (!target) return
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function sendKey(key: string, down: boolean) {
@@ -426,8 +409,6 @@ async function checkSession() {
 async function bootAfterAuth() {
   await hydrateAppliedCameraUrl()
   connectWs()
-  await nextTick()
-  bindCamera()
 }
 
 async function submitLogin() {
@@ -562,35 +543,7 @@ function openPwdFormVoluntary() {
 }
 
 //--------//
-// 模块：摄像头 — 绑定 video/img、从设置/API hydrate（仅外部流 URL）
-function bindCamera() {
-  const src = cameraSrc.value
-  if (cameraUseImage.value) {
-    const el = camImgRef.value
-    if (!el) return
-    if (!src) {
-      el.removeAttribute('src')
-      return
-    }
-    el.onload = () => ingestLog(t('log.videoBound'))
-    el.onerror = () => ingestLog(t('log.camFail'))
-    el.src = src
-    return
-  }
-  const el = camVideoRef.value
-  if (!el) return
-  if (!src) {
-    el.removeAttribute('src')
-    return
-  }
-  el.src = src
-  el.muted = true
-  el
-    .play()
-    .then(() => ingestLog(t('log.videoBound')))
-    .catch(() => ingestLog(t('log.camFail')))
-}
-
+// 模块：摄像头 — 从设置/API hydrate 外部流 URL
 async function hydrateAppliedCameraUrl() {
   type CamSettings = {
     camera_url?: string
@@ -662,20 +615,12 @@ async function loadSettingsPanelData() {
   await refreshSerialDevices()
 }
 
-function deviceLabel(d: SerialDev): string {
-  if (d.target && d.target !== d.path) return `${d.path} → ${d.target}`
-  return d.path
-}
-
-function serialRoleTitle(role: SerialRoleKey): string {
-  if (role === 'atmega_uart') return t('serial.role.atmega_uart')
-  if (role === 'aux_serial') return t('serial.role.aux_serial')
-  return role
-}
-
-function onLangChange(e: Event) {
-  const v = (e.target as HTMLSelectElement).value as Locale
+function onLangChange(v: Locale) {
   if (v === 'en' || v === 'zh' || v === 'ko') setLocale(v)
+}
+
+function setSerialRole(role: SerialRoleKey, value: string) {
+  serialRolesDraft.value[role] = value
 }
 
 async function saveSettings() {
@@ -704,8 +649,6 @@ async function saveSettings() {
   } catch {
     ingestLog(t('log.settingsLocalOnly'))
   }
-  await nextTick()
-  bindCamera()
 }
 
 function clearStoredCamera() {
@@ -722,13 +665,6 @@ watch(settingsOpen, (open) => {
   }
 })
 
-watch(cameraSrc, () => {
-  void nextTick(() => bindCamera())
-})
-
-watch(cameraUseImage, () => {
-  void nextTick(() => bindCamera())
-})
 
 watch(keyboardEnabled, (v) => {
   localStorage.setItem(LS_KEYBOARD, v ? '1' : '0')
@@ -781,548 +717,106 @@ const statusColor = computed(() => {
 
 <template>
   <!-- -------- 根布局：会话门控 → 登录页 或 主界面 -------- -->
-  <div
-    class="relative flex h-full min-h-[600px] flex-col bg-pve-bg font-ui text-pve-text"
-    tabindex="0"
-  >
+  <div class="relative flex h-full min-h-[600px] flex-col bg-pve-bg font-ui text-pve-text" tabindex="0">
     <!-- -------- 模块：会话检查中 -------- -->
-    <div
-      v-if="!sessionReady"
-      class="flex flex-1 items-center justify-center font-mono text-sm text-pve-muted"
-    >
+    <div v-if="!sessionReady" class="flex flex-1 items-center justify-center font-mono text-sm text-pve-muted">
       {{ t('auth.checking') }}
     </div>
-    <!-- -------- 模块：未登录 — 登录表单 -------- -->
-    <div
+
+    <AppLogin
       v-else-if="!loggedIn"
-      class="flex flex-1 flex-col items-center justify-center gap-6 p-6"
-    >
-      <div class="w-full max-w-sm rounded border border-pve-border bg-pve-panel p-6 shadow-xl">
-        <h1 class="mb-1 text-center text-lg font-semibold text-white">{{ t('auth.loginTitle') }}</h1>
-        <p class="mb-4 text-center text-xs leading-relaxed text-pve-muted">
-          {{ t('auth.loginSubtitle') }}
-        </p>
-        <label class="mb-1 block text-xs text-pve-muted">{{ t('auth.username') }}</label>
-        <input
-          v-model="loginUser"
-          type="text"
-          autocomplete="username"
-          class="mb-3 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-sm text-pve-text focus:border-pve-accent focus:outline-none"
-        />
-        <label class="mb-1 block text-xs text-pve-muted">{{ t('auth.password') }}</label>
-        <input
-          v-model="loginPass"
-          type="password"
-          autocomplete="current-password"
-          class="mb-3 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-sm text-pve-text focus:border-pve-accent focus:outline-none"
-          @keydown.enter="submitLogin"
-        />
-        <p v-if="loginError" class="mb-2 font-mono text-xs text-pve-err">{{ loginError }}</p>
-        <button
-          type="button"
-          class="w-full rounded border border-pve-border bg-pve-header py-2 text-sm font-semibold text-white hover:bg-pve-accent disabled:opacity-50"
-          :disabled="loginBusy"
-          @click="submitLogin"
-        >
-          {{ loginBusy ? t('auth.busy') : t('auth.signIn') }}
-        </button>
-      </div>
-    </div>
+      v-model:login-user="loginUser"
+      v-model:login-pass="loginPass"
+      :login-error="loginError"
+      :login-busy="loginBusy"
+      @submit="submitLogin"
+    />
+
     <template v-else>
-    <!-- -------- 模块：顶栏 — 标题、WS 状态、设置/改密/登出 -------- -->
-    <header
-      class="flex h-9 shrink-0 items-center border-b border-pve-border bg-gradient-to-b from-[#454545] to-[#3a3a3a] px-3 text-sm shadow"
-    >
-      <span class="font-semibold tracking-tight text-white">OmniRoam</span>
-      <span class="mx-2 text-pve-muted">|</span>
-      <span class="text-pve-muted">{{ t('app.subtitle') }}</span>
-      <span class="ml-6 font-mono text-xs text-pve-accent2">{{ hostDisplay }}</span>
-      <div class="ml-auto flex items-center gap-3 font-mono text-xs">
-        <span class="text-pve-muted">{{ authUsername }}</span>
-        <span :class="statusColor">● {{ wsStateLabel }}</span>
-        <button
-          v-if="!mustChangePassword"
-          type="button"
-          class="rounded border border-pve-border bg-pve-panel px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-pve-text shadow hover:bg-pve-header"
-          @click="openPwdFormVoluntary"
-        >
-          {{ t('auth.changePasswordBtn') }}
-        </button>
-        <button
-          type="button"
-          class="rounded border border-pve-border bg-pve-panel px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-pve-warn shadow hover:bg-pve-header"
-          @click="submitLogout"
-        >
-          {{ t('auth.signOut') }}
-        </button>
-      </div>
-    </header>
+      <AppHeader
+        :host-display="hostDisplay"
+        :auth-username="authUsername"
+        :status-color="statusColor"
+        :ws-state-label="wsStateLabel"
+        :must-change-password="mustChangePassword"
+        @change-password="openPwdFormVoluntary"
+        @logout="submitLogout"
+      />
 
-    <!-- -------- 模块：改密提醒条 -------- -->
-    <div
-      v-if="mustChangePassword && pwdNudgeDismissed"
-      class="flex shrink-0 items-center justify-between gap-2 border-b border-amber-600/40 bg-amber-900/25 px-3 py-1.5 text-xs text-amber-200"
-    >
-      <span>{{ t('auth.bannerNudge') }}</span>
-      <button
-        type="button"
-        class="rounded border border-amber-500/50 px-2 py-0.5 font-semibold text-amber-100 hover:bg-amber-800/40"
-        @click="
-          pwdFormError = '';
-          pwdCurrent = '';
-          newPwd1 = '';
-          newPwd2 = '';
-          pwdModal = 'form'
-        "
-      >
-        {{ t('auth.pwdNudgeChange') }}
-      </button>
-    </div>
+      <PasswordNudgeBanner
+        v-if="mustChangePassword && pwdNudgeDismissed"
+        @open="openPwdFormVoluntary"
+      />
 
-    <!-- -------- 模块：左侧竖向菜单 — 功能页 / 设置页 -------- -->
-    <div class="flex min-h-0 flex-1">
-      <aside class="flex w-14 shrink-0 flex-col items-stretch gap-2 border-r border-pve-border bg-[#242424] px-1.5 py-2">
-        <button
-          type="button"
-          class="min-h-14 rounded border px-1 text-xs font-semibold leading-tight transition-colors"
-          :class="activeMenu === 'function' ? 'border-pve-accent bg-pve-header text-white' : 'border-pve-border bg-pve-panel text-pve-muted hover:text-pve-text'"
-          @click="activeMenu = 'function'"
-        >
-          {{ t('menu.function') }}
-        </button>
-        <button
-          type="button"
-          class="min-h-14 rounded border px-1 text-xs font-semibold leading-tight transition-colors"
-          :class="activeMenu === 'settings' ? 'border-pve-accent bg-pve-header text-white' : 'border-pve-border bg-pve-panel text-pve-muted hover:text-pve-text'"
-          @click="activeMenu = 'settings'"
-        >
-          {{ t('menu.settings') }}
-        </button>
-      </aside>
+      <div class="flex min-h-0 flex-1">
+        <SideMenu v-model:active-menu="activeMenu" />
 
-      <div v-show="activeMenu === 'function'" class="flex min-h-0 flex-1 flex-col">
-    <!-- -------- 模块：主内容区 — 左侧视频，右侧 SSH 与文件管理同页滚动 -------- -->
-    <main class="flex min-h-0 flex-1 flex-col lg:flex-row">
-      <!-- -------- 子模块：视频画面 — 左侧 1/3，低分辨率也强制填满 -------- -->
-      <section
-        class="flex min-h-[320px] shrink-0 flex-col border-b border-pve-border lg:min-h-0 lg:w-1/3 lg:border-b-0 lg:border-r"
-      >
-        <div class="pve-panel-title flex items-center justify-between">
-          <span>{{ t('video.panelTitle') }}</span>
-          <span v-if="!cameraSrc" class="normal-case text-pve-warn">{{ t('video.noUrl') }}</span>
-        </div>
-        <div class="relative min-h-0 flex-1 overflow-hidden bg-black">
-          <img
-            v-if="cameraSrc && cameraUseImage"
-            ref="camImgRef"
-            class="h-full w-full object-fill"
-            alt=""
-          />
-          <video
-            v-else-if="cameraSrc"
-            ref="camVideoRef"
-            class="h-full w-full object-fill"
-            playsinline
-            autoplay
-            muted
-          />
-          <div
-            v-else
-            class="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center text-pve-muted"
-          >
-            <div class="h-32 w-full max-w-md border border-dashed border-pve-border bg-pve-panel/50" />
-            <p class="max-w-sm font-mono text-xs">
-              {{ t('video.emptyHint.before') }}
-              <strong class="text-pve-text">{{ t('video.emptyHint.settings') }}</strong>
-              {{ t('video.emptyHint.after') }}
-            </p>
-          </div>
-        </div>
+        <FeatureWorkspace
+          v-show="activeMenu === 'function'"
+          :camera-src="cameraSrc"
+          :camera-use-image="cameraUseImage"
+          :last-cmd-label="lastCmdLabel"
+          @media-bound="ingestLog(t('log.videoBound'))"
+          @media-error="ingestLog(t('log.camFail'))"
+        />
 
-        <!-- -------- 子模块：底盘操作说明 — 固定在视频栏下方 -------- -->
-        <footer class="shrink-0 border-t border-pve-border bg-pve-panel px-3 py-3 shadow-[inset_0_1px_0_#4a4a4a]">
-          <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-pve-muted">
-            {{ t('op.section') }}
-          </div>
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <div class="flex items-center gap-2">
-              <span class="pve-kbd">W</span>
-              <span class="text-pve-muted">{{ t('op.forward') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="pve-kbd">S</span>
-              <span class="text-pve-muted">{{ t('op.reverse') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="pve-kbd">A</span>
-              <span class="text-pve-muted">{{ t('op.strafeL') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="pve-kbd">D</span>
-              <span class="text-pve-muted">{{ t('op.strafeR') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="pve-kbd">Q</span>
-              <span class="text-pve-muted">{{ t('op.rotCCW') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="pve-kbd">E</span>
-              <span class="text-pve-muted">{{ t('op.rotCW') }}</span>
-            </div>
-          </div>
-          <div class="mt-3 font-mono text-xs text-pve-accent">
-            {{ t('op.active') }} <span class="text-white">{{ lastCmdLabel }}</span>
-          </div>
-        </footer>
-      </section>
-
-      <!-- -------- 子模块：右侧工作区 — 上方 SSH，下方文件管理 -------- -->
-      <section
-        ref="workspaceScrollRef"
-        class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#0c0e12] lg:w-2/3"
-      >
-        <section ref="terminalSectionRef" class="flex min-h-[440px] shrink-0 flex-col p-2 lg:min-h-[62vh]">
-          <div class="pve-panel-title flex items-center justify-between rounded-t border border-b-0 border-white/10">
-            <span>{{ t('nav.ssh') }}</span>
-            <span class="font-mono text-[10px] normal-case text-pve-muted">/ws/shell</span>
-          </div>
-          <DeskTerminal class="min-h-0 flex-1 rounded-b border border-white/10" />
-        </section>
-
-        <section ref="filesSectionRef" class="flex min-h-[540px] shrink-0 flex-col border-t border-pve-border p-2">
-          <div class="pve-panel-title flex items-center justify-between rounded-t border border-b-0 border-white/10">
-            <span>{{ t('nav.files') }}</span>
-            <span class="font-mono text-[10px] normal-case text-pve-muted">/api/fs/list</span>
-          </div>
-          <DeskFiles class="min-h-0 flex-1 rounded-b border border-white/10" />
-        </section>
-      </section>
-    </main>
+        <SettingsView
+          v-show="activeMenu === 'settings'"
+          v-model:camera-draft="settingsCameraDraft"
+          v-model:keyboard-enabled="keyboardEnabled"
+          :locale="locale"
+          :serial-role-keys="SERIAL_ROLE_KEYS"
+          :serial-roles-draft="serialRolesDraft"
+          :serial-devices="serialDevices"
+          :serial-list-loading="serialListLoading"
+          :serial-host-o-s="serialHostOS"
+          :update-status="updateStatus"
+          :update-check-busy="updateCheckBusy"
+          :update-check-message="updateCheckMessage"
+          :update-shas-line="updateShasLine"
+          @update-serial-role="setSerialRole"
+          @lang-change="onLangChange"
+          @save-settings="saveSettings"
+          @clear-stored-camera="clearStoredCamera"
+          @refresh-serial-devices="refreshSerialDevices"
+          @reconnect-web-socket="reconnectWebSocket"
+          @check-update="checkUpdateFromSettings"
+        />
       </div>
 
-      <!-- -------- 模块：设置页 — 由左侧菜单进入 -------- -->
-      <section v-show="activeMenu === 'settings'" class="min-h-0 flex-1 overflow-y-auto bg-pve-panel p-4 text-sm">
-        <div class="mx-auto max-w-3xl">
-          <div class="mb-4 border-b border-pve-border pb-3">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-pve-text">{{ t('settings.title') }}</h2>
-          </div>
-            <section class="mb-6">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">
-                {{ t('settings.langSection') }}
-              </h3>
-              <label class="mb-1 block text-xs text-pve-muted">{{ t('settings.langLabel') }}</label>
-              <select
-                class="w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text focus:border-pve-accent focus:outline-none"
-                :value="locale"
-                @change="onLangChange"
-              >
-                <option value="en">{{ t('settings.lang.en') }}</option>
-                <option value="zh">{{ t('settings.lang.zh') }}</option>
-                <option value="ko">{{ t('settings.lang.ko') }}</option>
-              </select>
-            </section>
+      <PasswordDialog
+        v-model:pwd-current="pwdCurrent"
+        v-model:new-pwd1="newPwd1"
+        v-model:new-pwd2="newPwd2"
+        :logged-in="loggedIn"
+        :modal="pwdModal"
+        :must-change-password="mustChangePassword"
+        :pwd-nudge-dismissed="pwdNudgeDismissed"
+        :pwd-form-error="pwdFormError"
+        :pwd-busy="pwdBusy"
+        @backdrop="onPwdBackdrop"
+        @dismiss-nudge="dismissPwdNudge"
+        @open-form-from-nudge="openPwdFormFromNudge"
+        @submit="submitChangePassword"
+        @back="pwdModal = pwdNudgeDismissed ? 'off' : 'nudge'"
+      />
 
-            <section class="mb-6">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('video.section') }}</h3>
-              <label class="mb-1 block text-xs text-pve-muted">{{ t('video.label') }}</label>
-              <textarea
-                v-model="settingsCameraDraft"
-                rows="3"
-                class="mb-2 w-full resize-y rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-xs text-pve-text placeholder:text-pve-muted focus:border-pve-accent focus:outline-none"
-                :placeholder="t('video.placeholder')"
-              />
-              <p class="mb-3 text-xs leading-relaxed text-pve-muted">
-                {{ t('video.hint') }}
-              </p>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-                  @click="saveSettings"
-                >
-                  {{ t('video.saveApply') }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-muted hover:text-pve-warn"
-                  @click="clearStoredCamera"
-                >
-                  {{ t('video.clearUrl') }}
-                </button>
-              </div>
-            </section>
-
-            <section class="mb-6">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('serial.section') }}</h3>
-              <div class="mb-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs font-semibold text-pve-text hover:bg-pve-header"
-                  :disabled="serialListLoading"
-                  @click="refreshSerialDevices"
-                >
-                  {{ serialListLoading ? t('serial.scanning') : t('serial.refresh') }}
-                </button>
-                <span class="font-mono text-[10px] text-pve-muted">OS: {{ serialHostOS || '—' }}</span>
-              </div>
-              <p v-if="serialHostOS && serialHostOS !== 'linux'" class="mb-3 text-xs text-pve-warn">
-                {{ t('serial.nonlinux') }}
-              </p>
-              <p class="mb-3 text-xs leading-relaxed text-pve-muted">{{ t('serial.hint') }}</p>
-
-              <div
-                v-for="role in SERIAL_ROLE_KEYS"
-                :key="role"
-                class="mb-3"
-              >
-                <label class="mb-1 block text-xs text-pve-muted">{{ serialRoleTitle(role) }}</label>
-                <select
-                  v-model="serialRolesDraft[role]"
-                  class="w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-[11px] text-pve-text focus:border-pve-accent focus:outline-none"
-                >
-                  <option value="">{{ t('serial.unassigned') }}</option>
-                  <option
-                    v-for="d in serialDevices"
-                    :key="role + d.path"
-                    :value="d.path"
-                  >
-                    {{ deviceLabel(d) }}
-                  </option>
-                </select>
-              </div>
-              <p
-                v-if="serialHostOS === 'linux' && !serialListLoading && serialDevices.length === 0"
-                class="text-xs text-pve-warn"
-              >
-                {{ t('serial.emptyList') }}
-              </p>
-            </section>
-
-            <section class="mb-6">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('conn.section') }}</h3>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs font-semibold text-pve-text hover:bg-pve-header"
-                @click="reconnectWebSocket"
-              >
-                {{ t('conn.reconnectWs') }}
-              </button>
-              <p class="mt-2 text-xs text-pve-muted">{{ t('conn.hint') }}</p>
-            </section>
-
-            <section class="mb-6">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('update.title') }}</h3>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs font-semibold text-pve-text hover:bg-pve-header disabled:opacity-50"
-                :disabled="updateCheckBusy"
-                @click="checkUpdateFromSettings"
-              >
-                {{ updateCheckBusy ? t('update.checking') : t('update.checkNow') }}
-              </button>
-              <p v-if="updateStatus?.enabled" class="mt-2 font-mono text-[11px] text-pve-accent2">{{ updateShasLine }}</p>
-              <p v-if="updateCheckMessage" class="mt-2 text-xs leading-relaxed text-pve-muted">{{ updateCheckMessage }}</p>
-              <p v-if="updateStatus?.git_error" class="mt-2 font-mono text-[11px] text-pve-warn">{{ t('update.gitErr') }} {{ updateStatus.git_error }}</p>
-            </section>
-
-            <section class="mb-6">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('ctrl.section') }}</h3>
-              <label class="flex cursor-pointer items-center gap-2 text-xs text-pve-text">
-                <input v-model="keyboardEnabled" type="checkbox" class="accent-pve-accent" />
-                {{ t('ctrl.keyboard') }}
-              </label>
-              <p class="mt-2 text-xs text-pve-muted">{{ t('ctrl.hint') }}</p>
-            </section>
-
-            <section class="rounded border border-dashed border-pve-border bg-pve-bg/80 p-3">
-              <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-pve-muted">{{ t('ros.section') }}</h3>
-              <p class="text-xs leading-relaxed text-pve-muted">
-                {{ t('ros.body') }}
-              </p>
-            </section>
-        </div>
-      </section>
-    </div>
-
-    <!-- -------- 模块：改密对话框 -------- -->
-    <Teleport to="body">
-      <div
-        v-if="loggedIn && pwdModal !== 'off'"
-        class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
-        role="presentation"
-        @click.self="onPwdBackdrop"
-      >
-        <div
-          class="w-full max-w-md rounded border border-pve-border bg-pve-panel p-5 shadow-2xl"
-          role="dialog"
-          @click.stop
-        >
-          <template v-if="pwdModal === 'nudge'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('auth.pwdNudgeTitle') }}</h2>
-            <p class="mb-4 text-xs leading-relaxed text-pve-muted">{{ t('auth.pwdNudgeBody') }}</p>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="dismissPwdNudge"
-              >
-                {{ t('auth.pwdNudgeLater') }}
-              </button>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-                @click="openPwdFormFromNudge"
-              >
-                {{ t('auth.pwdNudgeChange') }}
-              </button>
-            </div>
-          </template>
-          <template v-else-if="pwdModal === 'form'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('auth.pwdChangeTitle') }}</h2>
-            <template v-if="!mustChangePassword">
-              <label class="mb-1 block text-xs text-pve-muted">{{ t('auth.currentPassword') }}</label>
-              <input
-                v-model="pwdCurrent"
-                type="password"
-                autocomplete="current-password"
-                class="mb-2 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-sm text-pve-text focus:border-pve-accent focus:outline-none"
-              />
-            </template>
-            <label class="mb-1 block text-xs text-pve-muted">{{ t('auth.newPassword') }}</label>
-            <input
-              v-model="newPwd1"
-              type="password"
-              autocomplete="new-password"
-              class="mb-2 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-sm text-pve-text focus:border-pve-accent focus:outline-none"
-            />
-            <label class="mb-1 block text-xs text-pve-muted">{{ t('auth.confirmPassword') }}</label>
-            <input
-              v-model="newPwd2"
-              type="password"
-              autocomplete="new-password"
-              class="mb-2 w-full rounded border border-pve-border bg-pve-bg px-2 py-1.5 font-mono text-sm text-pve-text focus:border-pve-accent focus:outline-none"
-              @keydown.enter="submitChangePassword"
-            />
-            <p v-if="pwdFormError" class="mb-2 font-mono text-xs text-pve-err">{{ pwdFormError }}</p>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                v-if="mustChangePassword"
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="pwdModal = pwdNudgeDismissed ? 'off' : 'nudge'"
-              >
-                {{ t('auth.back') }}
-              </button>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent disabled:opacity-50"
-                :disabled="pwdBusy"
-                @click="submitChangePassword"
-              >
-                {{ pwdBusy ? t('auth.busy') : t('auth.submit') }}
-              </button>
-            </div>
-          </template>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- -------- 模块：自更新提示与部署输出 -------- -->
-    <Teleport to="body">
-      <div
-        v-if="loggedIn && updateModal !== 'off'"
-        class="fixed inset-0 z-[210] flex items-center justify-center bg-black/65 p-4"
-        role="presentation"
-        @click.self="onUpdateBackdrop"
-      >
-        <div
-          class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded border border-pve-border bg-pve-panel p-5 shadow-2xl"
-          role="dialog"
-          aria-modal="true"
-          @click.stop
-        >
-          <template v-if="updateModal === 'prompt'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('update.title') }}</h2>
-            <p class="mb-2 text-xs leading-relaxed text-pve-muted">{{ t('update.available') }}</p>
-            <p class="mb-3 font-mono text-[11px] text-pve-accent2">{{ updateShasLine }}</p>
-            <h3 class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-pve-muted">
-              {{ t('update.changelog') }}
-            </h3>
-            <pre
-              v-if="updateStatus?.changelog && updateStatus.changelog.trim()"
-              class="mb-3 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-pve-border bg-pve-bg p-2 font-mono text-[11px] text-pve-text"
-              >{{ updateStatus.changelog }}</pre>
-            <p v-else class="mb-3 font-mono text-[11px] text-pve-muted">{{ t('update.noChangelog') }}</p>
-            <p v-if="updateStatus?.changelog_error" class="mb-2 font-mono text-[11px] text-pve-warn">
-              {{ t('update.changelogFetchErr') }} {{ updateStatus.changelog_error }}
-            </p>
-            <p v-if="updateStatus?.git_error" class="mb-3 font-mono text-[11px] text-pve-warn">
-              {{ t('update.gitErr') }} {{ updateStatus.git_error }}
-            </p>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="
-                  dismissUpdateForRemoteSha();
-                  updateModal = 'off'
-                "
-              >
-                {{ t('update.later') }}
-              </button>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-                @click="beginUpdateCountdown"
-              >
-                {{ t('update.confirm') }}
-              </button>
-            </div>
-          </template>
-
-          <template v-else-if="updateModal === 'countdown'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('update.countdownTitle') }}</h2>
-            <p class="mb-2 text-xs leading-relaxed text-pve-muted">{{ t('update.countdownBody') }}</p>
-            <p class="mb-1 text-sm font-semibold text-amber-100/95">{{ t('update.sureQuestion') }}</p>
-            <p class="mb-4 font-mono text-xs text-pve-muted">{{ updateCountdownWaitText }}</p>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-bg px-3 py-1.5 text-xs text-pve-text hover:bg-pve-header"
-                @click="cancelUpdateFlow"
-              >
-                {{ t('update.cancel') }}
-              </button>
-              <button
-                type="button"
-                class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent disabled:opacity-40"
-                :disabled="updateCountdown > 0"
-                @click="runDeployUpdate"
-              >
-                {{ t('update.startDeploy') }}
-              </button>
-            </div>
-          </template>
-
-          <template v-else-if="updateModal === 'deploying'">
-            <h2 class="mb-2 text-sm font-semibold text-white">{{ t('update.title') }}</h2>
-            <p v-if="updateDeployBusy" class="mb-2 text-xs text-pve-muted">{{ t('update.deploying') }}</p>
-            <pre
-              class="mb-3 max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-pve-border bg-black/40 p-2 font-mono text-[10px] text-pve-text"
-              >{{ updateDeployOutput }}</pre
-            >
-            <button
-              v-if="!updateDeployBusy"
-              type="button"
-              class="rounded border border-pve-border bg-pve-header px-3 py-1.5 text-xs font-semibold text-white hover:bg-pve-accent"
-              @click="closeDeployModal"
-            >
-              {{ t('settings.close') }}
-            </button>
-          </template>
-        </div>
-      </div>
-    </Teleport>
+      <UpdateDialog
+        :logged-in="loggedIn"
+        :modal="updateModal"
+        :update-status="updateStatus"
+        :update-shas-line="updateShasLine"
+        :update-countdown="updateCountdown"
+        :update-countdown-wait-text="updateCountdownWaitText"
+        :update-deploy-output="updateDeployOutput"
+        :update-deploy-busy="updateDeployBusy"
+        @backdrop="onUpdateBackdrop"
+        @later="laterUpdatePrompt"
+        @begin-countdown="beginUpdateCountdown"
+        @cancel="cancelUpdateFlow"
+        @deploy="runDeployUpdate"
+        @close="closeDeployModal"
+      />
     </template>
   </div>
 </template>
