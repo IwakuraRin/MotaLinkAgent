@@ -47,6 +47,10 @@
 
 # Kernel Module Compile Results
 *.mod*
+!go.mod
+!*/go.mod
+!go.sum
+!*/go.sum
 *.cmd
 .tmp_versions/
 modules.order
