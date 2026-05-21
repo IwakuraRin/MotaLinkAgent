@@ -9,17 +9,17 @@ frontend / mobile app
         |
         | HTTP / WebSocket
         v
-backend-go
+MasterComputer/backend-go
         |
         | local process / future Unix socket
         v
-backend
+MasterComputer/backend
         |
         | serial protocol / low latency control
         v
-ATmega2560 / ESP32 / motor drivers
+SlaveDevice/ATmega2560 / motor drivers
 
-ros
+MasterComputer/ros
         |
         | topics / launch / perception / kinematics
         v
@@ -30,18 +30,19 @@ camera / YOLO / navigation / sensor nodes
 
 | 目录 | 职责 |
 |------|------|
-| `backend/` | C 语言控制核心：电机控制、串口协议、底盘运动、机械臂控制、安全限幅、本地命令接口 |
-| `backend-go/` | Go API 层：HTTP API、登录鉴权、前端/手机通信、配置管理、文件管理、调用 C 控制核心 |
-| `ros/` | ROS 层：运动学、传感器节点、相机、YOLO、导航和机器人实验节点 |
-| `frontend/` | 前端界面，通过 Go API 控制机器人和查看状态 |
-| `database/` | 可选数据库实验配置 |
-| `deploy/` | 后续 deb/systemd/镜像部署文件 |
-| `systeminfo/` | 可选系统信息小工具 |
+| `SlaveDevice/ATmega2560/` | 下位机固件：串口通信、电机执行、传感器采集和实时控制 |
+| `MasterComputer/backend/` | C 语言控制核心：电机控制、串口协议、底盘运动、机械臂控制、安全限幅、本地命令接口 |
+| `MasterComputer/backend-go/` | Go API 层：HTTP API、登录鉴权、前端/手机通信、配置管理、文件管理、调用 C 控制核心 |
+| `MasterComputer/ros/` | ROS 层：运动学、传感器节点、相机、YOLO、导航和机器人实验节点 |
+| `MasterComputer/frontend/` | 前端界面，通过 Go API 控制机器人和查看状态 |
+| `MasterComputer/database/` | 可选数据库实验配置 |
+| `MasterComputer/deploy/` | 后续 deb/systemd/镜像部署文件 |
+| `MasterComputer/systeminfo/` | 可选系统信息小工具 |
 
 ## 构建控制核心
 
 ```bash
-cd backend
+cd MasterComputer/backend
 make
 ./amseokbot-control-core health
 ```
@@ -49,7 +50,7 @@ make
 ## 验证 Go API
 
 ```bash
-cd backend-go
+cd MasterComputer/backend-go
 go test ./...
 go run ./cmd/hostpc-api -control-core ../backend/amseokbot-control-core
 ```

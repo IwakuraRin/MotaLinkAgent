@@ -66,6 +66,10 @@ ros/catkin_ws/build/
 ros/catkin_ws/devel/
 ros/catkin_ws/install/
 ros/catkin_ws/logs/
+MasterComputer/ros/catkin_ws/build/
+MasterComputer/ros/catkin_ws/devel/
+MasterComputer/ros/catkin_ws/install/
+MasterComputer/ros/catkin_ws/logs/
 software/ros/catkin_ws/build/
 software/ros/catkin_ws/devel/
 software/ros/catkin_ws/install/
@@ -73,6 +77,7 @@ software/ros/catkin_ws/logs/
 
 # PlatformIO（simplerobotic/ 内另有 .gitignore）
 simplerobotic/.pio/
+SlaveDevice/ATmega2560/.pio/
 
 # OmniRoam 根目录 start/restart 脚本写入的 PID 与日志
 .omniroam/
@@ -109,10 +114,17 @@ frontend/node_modules/
 frontend/.vite/
 frontend/.vue-global-types/
 frontend/dist/
+MasterComputer/frontend/node_modules/
+MasterComputer/frontend/.vite/
+MasterComputer/frontend/.vue-global-types/
+MasterComputer/frontend/dist/
 
 # C control core build output
 backend/amseokbot-control-core
 backend/hostpc-c
+MasterComputer/backend/amseokbot-control-core
+MasterComputer/backend/hostpc-c
+MasterComputer/backend-go/hostpc-api
 
 # Local AI assistant skills
 SKILL.md
