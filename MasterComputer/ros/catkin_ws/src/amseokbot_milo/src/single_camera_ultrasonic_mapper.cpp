@@ -19,7 +19,6 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <std_msgs/UInt16.h>
-#include <tf/transform_datatypes.h>
 
 namespace amseokbot_milo {
 
@@ -60,6 +59,12 @@ double clampValue(double value, double low, double high) {
 
 double degToRad(double deg) {
   return deg * M_PI / 180.0;
+}
+
+double yawFromQuaternion(const geometry_msgs::Quaternion& q) {
+  const double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
+  const double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
+  return std::atan2(siny_cosp, cosy_cosp);
 }
 
 class CameraBearingEstimator {
@@ -232,7 +237,7 @@ class SingleCameraUltrasonicMapperNode {
   void handleOdom(const nav_msgs::Odometry::ConstPtr& msg) {
     odom_pose_.x = msg->pose.pose.position.x;
     odom_pose_.y = msg->pose.pose.position.y;
-    odom_pose_.yaw = tf::getYaw(msg->pose.pose.orientation);
+    odom_pose_.yaw = yawFromQuaternion(msg->pose.pose.orientation);
     odom_pose_.stamp = msg->header.stamp.isZero() ? ros::Time::now() : msg->header.stamp;
   }
 

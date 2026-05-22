@@ -58,7 +58,6 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>nav_msgs</build_depend>
-  <build_depend>tf</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>roslib</build_depend>
   <build_export_depend>roscpp</build_export_depend>
@@ -66,7 +65,6 @@
   <build_export_depend>sensor_msgs</build_export_depend>
   <build_export_depend>geometry_msgs</build_export_depend>
   <build_export_depend>nav_msgs</build_export_depend>
-  <build_export_depend>tf</build_export_depend>
   <build_export_depend>cv_bridge</build_export_depend>
   <build_export_depend>roslib</build_export_depend>
   <exec_depend>roscpp</exec_depend>
@@ -77,7 +75,6 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>tf</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <!-- usb_camera_web.launch: physical USB camera -> ROS Image -> MJPEG HTTP stream -->
   <exec_depend>usb_cam</exec_depend>

@@ -8,7 +8,6 @@
   <arg name="odom_topic" default="/odom"/>
   <arg name="odom_frame" default="odom"/>
   <arg name="base_frame" default="base_link"/>
-  <arg name="publish_tf" default="true"/>
 
   <arg name="wheel_base_radius_m" default="0.1337147"/>
   <arg name="wheel_radius_m" default="0.0425"/>
@@ -21,7 +20,6 @@
     <param name="odom_topic" value="$(arg odom_topic)"/>
     <param name="odom_frame" value="$(arg odom_frame)"/>
     <param name="base_frame" value="$(arg base_frame)"/>
-    <param name="publish_tf" value="$(arg publish_tf)"/>
     <param name="wheel_base_radius_m" value="$(arg wheel_base_radius_m)"/>
     <param name="wheel_radius_m" value="$(arg wheel_radius_m)"/>
     <param name="wheel_feedback_scale" value="$(arg wheel_feedback_scale)"/>

@@ -2,7 +2,7 @@
 |--------------------------------------------------------------------------
 | 霍尔轮速里程计节点
 |--------------------------------------------------------------------------
-| 订阅 ATmega 串口桥发布的三轮霍尔反馈速度，按三全向轮正运动学积分 /odom 和 TF。
+| 订阅 ATmega 串口桥发布的三轮霍尔反馈速度，按三全向轮正运动学积分 /odom。
 |--------------------------------------------------------------------------
 */
 
@@ -16,8 +16,6 @@
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
 #include <std_msgs/Float32MultiArray.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_datatypes.h>
 
 namespace amseokbot_milo {
 
@@ -38,7 +36,6 @@ struct WheelOdometryConfig {
   std::string base_frame = "base_link";
   std::vector<double> wheel_angles_deg {29.9459, 149.6229, -90.8207};
   std::vector<double> wheel_signs {1.0, 1.0, 1.0};
-  bool publish_tf = true;
 };
 
 /*
@@ -60,6 +57,13 @@ double normalizeAngle(double value) {
     value += 2.0 * M_PI;
   }
   return value;
+}
+
+geometry_msgs::Quaternion quaternionFromYaw(double yaw) {
+  geometry_msgs::Quaternion q;
+  q.z = std::sin(yaw * 0.5);
+  q.w = std::cos(yaw * 0.5);
+  return q;
 }
 
 bool solve3x3(double a[3][4], std::array<double, 3>& out) {
@@ -162,7 +166,6 @@ class WheelOdometryNode {
     private_nh_.param("wheel_feedback_scale", config.wheel_feedback_scale, config.wheel_feedback_scale);
     private_nh_.param("feedback_timeout_s", config.feedback_timeout_s, config.feedback_timeout_s);
     private_nh_.param("publish_rate_hz", config.publish_rate_hz, config.publish_rate_hz);
-    private_nh_.param("publish_tf", config.publish_tf, config.publish_tf);
     private_nh_.param<std::string>("odom_frame", config.odom_frame, config.odom_frame);
     private_nh_.param<std::string>("base_frame", config.base_frame, config.base_frame);
     private_nh_.getParam("wheel_angles_deg", config.wheel_angles_deg);
@@ -225,7 +228,7 @@ class WheelOdometryNode {
       twist = {0.0, 0.0, 0.0};
     }
 
-    const geometry_msgs::Quaternion orientation = tf::createQuaternionMsgFromYaw(yaw_rad_);
+    const geometry_msgs::Quaternion orientation = quaternionFromYaw(yaw_rad_);
     nav_msgs::Odometry odom;
     odom.header.stamp = now;
     odom.header.frame_id = config_.odom_frame;
@@ -238,12 +241,6 @@ class WheelOdometryNode {
     odom.twist.twist.angular.z = twist[2];
     odom_pub_.publish(odom);
 
-    if (config_.publish_tf) {
-      tf::Transform transform;
-      transform.setOrigin(tf::Vector3(x_m_, y_m_, 0.0));
-      transform.setRotation(tf::Quaternion(orientation.x, orientation.y, orientation.z, orientation.w));
-      tf_broadcaster_.sendTransform(tf::StampedTransform(transform, now, config_.odom_frame, config_.base_frame));
-    }
   }
 
   ros::NodeHandle nh_;
@@ -251,7 +248,6 @@ class WheelOdometryNode {
   ros::Publisher odom_pub_;
   ros::Subscriber wheel_sub_;
   ros::Timer timer_;
-  tf::TransformBroadcaster tf_broadcaster_;
   WheelOdometryConfig config_;
   OmniTriangleForwardKinematics kinematics_;
   std::array<double, 3> last_body_twist_ {0.0, 0.0, 0.0};
