@@ -1,11 +1,13 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- 作用：启动 ATmega2560 USB-UART 桥，并把超声波距离和本地急停状态转换成 ROS 话题。 -->
+  <!-- 作用：启动 ATmega2560 USB-UART 桥，并把超声波、急停和霍尔轮速反馈转换成 ROS 话题。 -->
   <arg name="port" default="/dev/ttyUSB0" doc="USB-UART 设备，如 /dev/ttyUSB0 或 /dev/ttyACM0"/>
   <arg name="baud" default="115200"/>
   <arg name="front_range_topic" default="/safety/front_range_mm"/>
   <arg name="obstacle_stop_topic" default="/safety/obstacle_stop"/>
   <arg name="safety_event_topic" default="/safety/events"/>
+  <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>
+  <arg name="status_poll_rate_hz" default="20.0"/>
 
   <node pkg="amseokbot_milo" type="atmega_serial_bridge" name="atmega_serial_bridge" output="screen">
     <param name="port" value="$(arg port)"/>
@@ -13,5 +15,7 @@
     <param name="front_range_topic" value="$(arg front_range_topic)"/>
     <param name="obstacle_stop_topic" value="$(arg obstacle_stop_topic)"/>
     <param name="safety_event_topic" value="$(arg safety_event_topic)"/>
+    <param name="wheel_feedback_topic" value="$(arg wheel_feedback_topic)"/>
+    <param name="status_poll_rate_hz" value="$(arg status_poll_rate_hz)"/>
   </node>
 </launch>

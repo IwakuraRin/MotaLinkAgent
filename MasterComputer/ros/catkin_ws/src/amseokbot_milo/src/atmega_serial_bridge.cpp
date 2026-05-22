@@ -7,10 +7,12 @@
 */
 
 #include <atomic>
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <cstring>
 #include <fcntl.h>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <unistd.h>
@@ -18,6 +20,7 @@
 
 #include <ros/ros.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/String.h>
 #include <std_msgs/UInt16.h>
 
@@ -138,7 +141,7 @@ bool parseKeyUInt(const std::string& line, const std::string& key, uint32_t& val
   }
   const std::size_t number_begin = begin + key.size();
   std::size_t number_end = number_begin;
-  while (number_end < line.size() && line[number_end] >= 0 && line[number_end] <= 9) {
+  while (number_end < line.size() && line[number_end] >= '0' && line[number_end] <= '9') {
     number_end += 1;
   }
   if (number_end == number_begin) {
@@ -146,6 +149,30 @@ bool parseKeyUInt(const std::string& line, const std::string& key, uint32_t& val
   }
   try {
     value = static_cast<uint32_t>(std::stoul(line.substr(number_begin, number_end - number_begin)));
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+bool parseKeyInt(const std::string& line, const std::string& key, int32_t& value) {
+  const std::size_t begin = line.find(key);
+  if (begin == std::string::npos) {
+    return false;
+  }
+  const std::size_t number_begin = begin + key.size();
+  std::size_t number_end = number_begin;
+  if (number_end < line.size() && (line[number_end] == '-' || line[number_end] == '+')) {
+    number_end += 1;
+  }
+  while (number_end < line.size() && line[number_end] >= '0' && line[number_end] <= '9') {
+    number_end += 1;
+  }
+  if (number_end == number_begin || (number_end == number_begin + 1 && (line[number_begin] == '-' || line[number_begin] == '+'))) {
+    return false;
+  }
+  try {
+    value = static_cast<int32_t>(std::stol(line.substr(number_begin, number_end - number_begin)));
     return true;
   } catch (...) {
     return false;
@@ -167,7 +194,7 @@ bool lineMeansObstacleClear(const std::string& line) {
 |--------------------------------------------------------------------------
 | ROS 串口桥节点
 |--------------------------------------------------------------------------
-| 订阅 ~tx 写串口，读取串口行后发布原始行、前方距离和本地急停状态。
+| 订阅 ~tx 写串口，读取串口行后发布原始行、前方距离、本地急停和霍尔轮速反馈。
 |--------------------------------------------------------------------------
 */
 class AtmegaSerialBridgeNode {
@@ -179,6 +206,8 @@ class AtmegaSerialBridgeNode {
     private_nh_.param<std::string>("front_range_topic", front_range_topic_, "/safety/front_range_mm");
     private_nh_.param<std::string>("obstacle_stop_topic", obstacle_stop_topic_, "/safety/obstacle_stop");
     private_nh_.param<std::string>("safety_event_topic", safety_event_topic_, "/safety/events");
+    private_nh_.param<std::string>("wheel_feedback_topic", wheel_feedback_topic_, "/chassis/wheel_feedback");
+    private_nh_.param("status_poll_rate_hz", status_poll_rate_hz_, 20.0);
 
     if (!serial_.openPort(port_, baud_)) {
       ros::shutdown();
@@ -189,11 +218,21 @@ class AtmegaSerialBridgeNode {
     range_pub_ = nh_.advertise<std_msgs::UInt16>(front_range_topic_, 20);
     obstacle_pub_ = nh_.advertise<std_msgs::Bool>(obstacle_stop_topic_, 20, true);
     safety_event_pub_ = nh_.advertise<std_msgs::String>(safety_event_topic_, 50);
+    wheel_feedback_pub_ = nh_.advertise<std_msgs::Float32MultiArray>(wheel_feedback_topic_, 20);
     tx_sub_ = private_nh_.subscribe("tx", 50, &AtmegaSerialBridgeNode::handleTx, this);
+    status_timer_ = nh_.createTimer(
+      ros::Duration(1.0 / std::max(1.0, status_poll_rate_hz_)),
+      &AtmegaSerialBridgeNode::handleStatusPoll,
+      this);
     running_.store(true);
     read_thread_ = std::thread(&AtmegaSerialBridgeNode::readLoop, this);
 
-    ROS_INFO("atmega_serial_bridge: %s @ %d, range=%s obstacle=%s", port_.c_str(), baud_, front_range_topic_.c_str(), obstacle_stop_topic_.c_str());
+    ROS_INFO("atmega_serial_bridge: %s @ %d, range=%s obstacle=%s wheel_feedback=%s",
+             port_.c_str(),
+             baud_,
+             front_range_topic_.c_str(),
+             obstacle_stop_topic_.c_str(),
+             wheel_feedback_topic_.c_str());
   }
 
   ~AtmegaSerialBridgeNode() {
@@ -206,10 +245,22 @@ class AtmegaSerialBridgeNode {
  private:
   void handleTx(const std_msgs::String::ConstPtr& msg) {
     std::string data = msg->data;
-    if (append_newline_ && (data.empty() || data.back() != n)) {
-      data.push_back(n);
+    if (append_newline_ && (data.empty() || data.back() != '\n')) {
+      data.push_back('\n');
     }
-    serial_.writeLine(data);
+    writeSerialLine(data);
+  }
+
+  void handleStatusPoll(const ros::TimerEvent&) {
+    if (!running_.load()) {
+      return;
+    }
+    writeSerialLine("STATUS?\n");
+  }
+
+  void writeSerialLine(const std::string& line) {
+    std::lock_guard<std::mutex> lock(serial_write_mutex_);
+    serial_.writeLine(line);
   }
 
   void readLoop() {
@@ -221,10 +272,10 @@ class AtmegaSerialBridgeNode {
         rate.sleep();
         continue;
       }
-      if (byte == n) {
+      if (byte == '\n') {
         publishLine(line);
         line.clear();
-      } else if (byte != r && line.size() < 160) {
+      } else if (byte != '\r' && line.size() < 160) {
         line.push_back(byte);
       } else if (line.size() >= 160) {
         line.clear();
@@ -255,6 +306,21 @@ class AtmegaSerialBridgeNode {
       obstacle_pub_.publish(obstacle_msg);
       safety_event_pub_.publish(raw_msg);
     }
+
+    int32_t wheel0 = 0;
+    int32_t wheel1 = 0;
+    int32_t wheel2 = 0;
+    if (parseKeyInt(line, "w0=", wheel0) &&
+        parseKeyInt(line, "w1=", wheel1) &&
+        parseKeyInt(line, "w2=", wheel2)) {
+      std_msgs::Float32MultiArray feedback_msg;
+      feedback_msg.data = {
+        static_cast<float>(wheel0),
+        static_cast<float>(wheel1),
+        static_cast<float>(wheel2)
+      };
+      wheel_feedback_pub_.publish(feedback_msg);
+    }
   }
 
   ros::NodeHandle nh_;
@@ -263,15 +329,20 @@ class AtmegaSerialBridgeNode {
   ros::Publisher range_pub_;
   ros::Publisher obstacle_pub_;
   ros::Publisher safety_event_pub_;
+  ros::Publisher wheel_feedback_pub_;
   ros::Subscriber tx_sub_;
+  ros::Timer status_timer_;
   SerialPort serial_;
   std::thread read_thread_;
   std::atomic<bool> running_ {false};
+  std::mutex serial_write_mutex_;
   std::string port_;
   std::string front_range_topic_;
   std::string obstacle_stop_topic_;
   std::string safety_event_topic_;
+  std::string wheel_feedback_topic_;
   int baud_ = 115200;
+  double status_poll_rate_hz_ = 20.0;
   bool append_newline_ = true;
 };
 

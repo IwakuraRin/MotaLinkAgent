@@ -34,6 +34,8 @@
   <arg name="atmega_port" default="/dev/ttyUSB0"/>
   <arg name="atmega_baud" default="115200"/>
   <arg name="front_range_topic" default="/safety/front_range_mm"/>
+  <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>
+  <arg name="status_poll_rate_hz" default="20.0"/>
   <arg name="map_topic" default="/mapping/local_occupancy"/>
 
   <group if="$(arg start_atmega_bridge)">
@@ -41,6 +43,8 @@
       <arg name="port" value="$(arg atmega_port)"/>
       <arg name="baud" value="$(arg atmega_baud)"/>
       <arg name="front_range_topic" value="$(arg front_range_topic)"/>
+      <arg name="wheel_feedback_topic" value="$(arg wheel_feedback_topic)"/>
+      <arg name="status_poll_rate_hz" value="$(arg status_poll_rate_hz)"/>
     </include>
   </group>
 

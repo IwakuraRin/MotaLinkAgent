@@ -7,9 +7,11 @@
 <launch>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
   <arg name="wheel_omega_topic" default="/chassis/wheel_omega"/>
+  <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>
   <arg name="serial_tx_topic" default="/atmega_serial_bridge/tx"/>
   <arg name="obstacle_stop_topic" default="/safety/obstacle_stop"/>
   <arg name="publish_serial" default="true"/>
+  <arg name="start_wheel_odometry" default="true"/>
 
   <arg name="wheel_base_radius_m" default="0.1337147"/>
   <arg name="wheel_radius_m" default="0.0425"/>
@@ -38,4 +40,13 @@
     <rosparam param="wheel_angles_deg">[29.9459, 149.6229, -90.8207]</rosparam>
     <rosparam param="wheel_signs">[1.0, 1.0, 1.0]</rosparam>
   </node>
+
+  <group if="$(arg start_wheel_odometry)">
+    <include file="$(find amseokbot_milo)/launch/wheel_odometry.launch">
+      <arg name="wheel_feedback_topic" value="$(arg wheel_feedback_topic)"/>
+      <arg name="wheel_feedback_scale" value="$(arg wheel_command_scale)"/>
+      <arg name="wheel_base_radius_m" value="$(arg wheel_base_radius_m)"/>
+      <arg name="wheel_radius_m" value="$(arg wheel_radius_m)"/>
+    </include>
+  </group>
 </launch>

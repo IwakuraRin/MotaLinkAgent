@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  霍尔轮速里程计启动文件：
+  使用 32F103 驱动板回传的三轮霍尔速度反馈，发布 /odom 和 odom->base_link。
+-->
+<launch>
+  <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>
+  <arg name="odom_topic" default="/odom"/>
+  <arg name="odom_frame" default="odom"/>
+  <arg name="base_frame" default="base_link"/>
+  <arg name="publish_tf" default="true"/>
+
+  <arg name="wheel_base_radius_m" default="0.1337147"/>
+  <arg name="wheel_radius_m" default="0.0425"/>
+  <arg name="wheel_feedback_scale" default="100.0"/>
+  <arg name="feedback_timeout_s" default="0.5"/>
+  <arg name="publish_rate_hz" default="30.0"/>
+
+  <node pkg="amseokbot_milo" type="wheel_odometry" name="wheel_odometry" output="screen">
+    <param name="wheel_feedback_topic" value="$(arg wheel_feedback_topic)"/>
+    <param name="odom_topic" value="$(arg odom_topic)"/>
+    <param name="odom_frame" value="$(arg odom_frame)"/>
+    <param name="base_frame" value="$(arg base_frame)"/>
+    <param name="publish_tf" value="$(arg publish_tf)"/>
+    <param name="wheel_base_radius_m" value="$(arg wheel_base_radius_m)"/>
+    <param name="wheel_radius_m" value="$(arg wheel_radius_m)"/>
+    <param name="wheel_feedback_scale" value="$(arg wheel_feedback_scale)"/>
+    <param name="feedback_timeout_s" value="$(arg feedback_timeout_s)"/>
+    <param name="publish_rate_hz" value="$(arg publish_rate_hz)"/>
+
+    <rosparam param="wheel_angles_deg">[29.9459, 149.6229, -90.8207]</rosparam>
+    <rosparam param="wheel_signs">[1.0, 1.0, 1.0]</rosparam>
+  </node>
+</launch>
