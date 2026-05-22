@@ -1,12 +1,12 @@
 // 展示代码结构：
 //   · locale ref + localStorage 持久化
-//   · 多语言文案表 M（en/zh/ko）· t() 翻译函数 · initLocale / setLocale
+//   · 多语言文案表 M（en/zh）· t() 翻译函数 · initLocale / setLocale
 //
 import { ref } from 'vue'
 
 //--------//
 // 模块：语言类型与当前 locale
-export type Locale = 'en' | 'zh' | 'ko'
+export type Locale = 'en' | 'zh'
 
 const LS = 'omniroam.locale'
 
@@ -54,7 +54,6 @@ const M: Record<Locale, Record<string, string>> = {
     'settings.langLabel': 'Interface language',
     'settings.lang.en': 'English',
     'settings.lang.zh': '中文',
-    'settings.lang.ko': '한국어',
     'video.section': 'Video',
     'video.modeUrl': 'External stream URL',
     'video.modeDevice': 'Deprecated host-camera mode',
@@ -263,7 +262,6 @@ const M: Record<Locale, Record<string, string>> = {
     'settings.langLabel': '界面语言',
     'settings.lang.en': 'English',
     'settings.lang.zh': '中文',
-    'settings.lang.ko': '한국어',
     'video.section': '视频',
     'video.modeUrl': '外部流地址',
     'video.modeDevice': '已弃用的本机摄像头模式',
@@ -430,225 +428,13 @@ const M: Record<Locale, Record<string, string>> = {
     'update.checking': '正在检查…',
     'update.upToDate': '当前已经是最新版本。',
   },
-  ko: {
-    'app.subtitle': '호스트 콘솔',
-    'auth.checking': '세션 확인 중…',
-    'auth.loginTitle': '로그인',
-    'auth.loginSubtitle':
-      '웹 전용 계정(MySQL 저장, Linux 계정과 무관). 기본 비밀번호는 배포 과정에서 생성됩니다 — 첫 로그인 후 변경하세요.',
-    'auth.username': '사용자 이름',
-    'auth.password': '비밀번호',
-    'auth.signIn': '로그인',
-    'auth.signOut': '로그아웃',
-    'auth.busy': '잠시만…',
-    'auth.error': '오류가 발생했습니다',
-    'auth.badCredentials': '사용자 이름 또는 비밀번호가 올바르지 않습니다',
-    'auth.pwdNudgeTitle': '보안 안내',
-    'auth.pwdNudgeBody':
-      '기본 비밀번호이거나 변경이 필요한 상태입니다. 새 비밀번호(8자 이상)를 설정하세요.',
-    'auth.pwdNudgeLater': '나중에',
-    'auth.pwdNudgeChange': '비밀번호 변경',
-    'auth.pwdChangeTitle': '새 비밀번호 설정',
-    'auth.newPassword': '새 비밀번호',
-    'auth.confirmPassword': '새 비밀번호 확인',
-    'auth.submit': '확인',
-    'auth.back': '뒤로',
-    'auth.passwordMismatch': '비밀번호가 일치하지 않습니다',
-    'auth.passwordShort': '비밀번호는 8자 이상이어야 합니다',
-    'auth.bannerNudge': '아직 기본 비밀번호입니다. 가능한 빨리 변경하는 것을 권장합니다.',
-    'auth.changePasswordBtn': '비밀번호',
-    'auth.currentPassword': '현재 비밀번호',
-    'auth.currentWrong': '현재 비밀번호가 올바르지 않습니다',
-    'auth.currentRequired': '현재 비밀번호를 입력하세요',
-    'settings.btn': '설정',
-    'menu.function': '기능',
-    'menu.settings': '설정',
-    'settings.title': '설정',
-    'settings.close': '닫기',
-    'settings.langSection': '언어',
-    'settings.langLabel': '표시 언어',
-    'settings.lang.en': 'English',
-    'settings.lang.zh': '中文',
-    'settings.lang.ko': '한국어',
-    'video.section': '영상',
-    'video.modeUrl': '외부 스트림 URL',
-    'video.modeDevice': '폐기된 호스트 카메라 모드',
-    'video.devicePath': '폐기된 비디오 장치 경로',
-    'video.deviceHint':
-      '전용 카메라 서비스의 스트림 URL을 여기에 넣으세요. HostPC 백엔드는 더 이상 로컬 카메라 장치를 직접 읽지 않습니다.',
-    'video.label': '카메라 스트림 URL (MJPEG / HLS)',
-    'video.placeholder': '예: http://192.168.1.10:8080/stream.mjpg',
-    'video.hint':
-      '이 브라우저와 서버의 hostpc-settings.json에 저장됩니다(LAN 공유). go2rtc, mediamtx, mjpg-streamer, ustreamer 같은 전용 카메라 서비스 URL을 사용하는 것을 권장합니다. 둘 다 비어 있을 때만 빌드 시 VITE_CAMERA_URL을 사용합니다.',
-    'video.saveApply': '저장 및 적용',
-    'video.clearUrl': 'URL 지우기',
-    'serial.section': 'USB 시리얼 연결',
-    'serial.refresh': '장치 목록 새로 고침',
-    'serial.scanning': '검색 중…',
-    'serial.unassigned': '— 미지정 —',
-    'serial.role.atmega_uart': 'ATmega / 섀시 UART',
-    'serial.role.aux_serial': '보조 시리얼(선택)',
-    'serial.hint':
-      'Linux 호스트가 /dev(ttyUSB*, ttyACM*, /dev/serial/by-id)를 검색합니다. 같은 USB에 ttyUSB0과 ttyACM0가 바뀌어도 경로가 유지되도록 by-id 경로를 권장합니다. hostpc-settings.json의 serial_roles에 저장되며 ROS/스크립트에서 읽을 수 있습니다.',
-    'serial.nonlinux': '시리얼 검색은 Linux 호스트에서만 동작합니다. 다른 OS에서는 빈 목록을 반환합니다.',
-    'serial.emptyList': '시리얼 장치가 없습니다. USB-UART를 연결한 뒤 새로 고침하세요(Linux, dialout 그룹).',
-    'conn.section': '연결',
-    'conn.reconnectWs': 'WebSocket 다시 연결',
-    'conn.hint': 'C 서버 재시작 또는 연결 끊김 후 사용하세요.',
-    'ctrl.section': '조작',
-    'ctrl.keyboard': '키보드 섀시 조작 (W A S D Q E)',
-    'ctrl.hint': '끄면 다른 입력란에서 타이핑해도 로봇이 움직이지 않습니다.',
-    'disp.section': '표시',
-    'ros.section': 'ROS / 비전',
-    'ros.body':
-      '라인 트래킹 등 매개변수는 ROS(rosparam / dynamic_reconfigure)에서 설정합니다. 여기서는 외부 카메라 URL, 시리얼, 로그, WebSocket을 다룹니다. launch에서 hostpc-settings.json의 ATmega 경로를 읽도록 연결할 수 있습니다.',
-    'video.panelTitle': '영상 — USB 카메라',
-    'video.noUrl': '카메라 URL 없음',
-    'video.emptyHint.before': '오른쪽 위',
-    'video.emptyHint.settings': '설정',
-    'video.emptyHint.after':
-      '에서 외부 스트림 URL을 설정하거나, 빌드 시 VITE_CAMERA_URL을 사용하세요.',
-    'log.panelTitle': '시스템 로그 — ROS / 시리얼 / 제어',
-    'op.section': '조작 — 섀시(홀로노믹)',
-    'op.forward': '전진',
-    'op.reverse': '후진',
-    'op.strafeL': '좌측 이동',
-    'op.strafeR': '우측 이동',
-    'op.rotCCW': '반시계 회전',
-    'op.rotCW': '시계 회전',
-    'op.active': '동작:',
-    'op.dash': '—',
-    'log.wsOpen': 'INFO  WebSocket 연결됨',
-    'log.wsClosed': 'WARN  WebSocket 끊김 — 2초 후 재연결…',
-    'log.wsManualReconnect': 'INFO  WebSocket 수동 재연결…',
-    'log.settingsApplied': 'INFO  설정 저장됨',
-    'log.camFail': 'WARN  카메라 스트림 실패(URL / CORS / 코덱)',
-    'log.settingsReject': 'WARN  서버가 설정 저장을 거부함',
-    'log.settingsLocalOnly': 'WARN  로컬에만 저장됨(API 연결 불가)',
-    'ws.disconnected': '끊김',
-    'ws.connecting': '연결 중',
-    'ws.open': '연결됨',
-    'ws.error': '오류',
-    'floatLog.title': '시스템 로그',
-    'floatLog.expand': '전체 화면',
-    'floatLog.shrink': '창 축소',
-    'log.videoBound': 'INFO  브라우저에서 영상 재생 중',
-    'nav.console': '콘솔',
-    'nav.ssh': 'ssh',
-    'nav.files': '파일 관리',
-    'novnc.toolbarTitle': '원격 화면 (noVNC)',
-    'novnc.connect': '연결',
-    'novnc.disconnect': '끊기',
-    'novnc.status.idle': '끊김',
-    'novnc.status.connecting': '연결 중…',
-    'novnc.status.connected': '연결됨',
-    'novnc.status.error': '오류',
-    'novnc.emptyHint':
-      'VNC 세션을 열 수 없습니다. HostPC가 실행되는 머신에서 VNC 서버를 띄우고(HostPC 기본 전달 대상은 tcp/127.0.0.1:5900, 디스플레이 :1이면 5901 시도) 환경변수 HOSTPC_VNC_ADDR 또는 -vnc-addr로 바꿀 수 있습니다.',
-    'novnc.securityFailure': 'VNC 보안 협상 실패',
-    'novnc.disconnectAborted': '세션이 준비되기 전에 닫혔습니다.',
-    'novnc.disconnectUnclean': '연결이 비정상적으로 끊겼습니다.',
-    'novnc.section': '원격 데스크톱 (noVNC)',
-    'novnc.proxyExplain':
-      '로그인 후 같은 HostPC의 /ws/vnc로 연결되며, HostPC가 로컬 TCP VNC 포트로 중계합니다. 브라우저에 WebSocket URL을 입력할 필요가 없습니다. 기본은 C 서버가 돌아가는 머신의 127.0.0.1:5900입니다.',
-    'novnc.hint':
-      'VNC 비밀번호가 있으면 아래에 입력(이 브라우저에만 저장). 호스트/포트를 바꾸려면 HOSTPC_VNC_ADDR 또는 -vnc-addr을 사용하세요.',
-    'novnc.passwordLabel': 'VNC 비밀번호(선택, 이 브라우저만)',
-    'desktop.tools': '도구',
-    'desktop.tools.logs': '시스템 로그',
-    'desktop.tools.files': '파일 탐색',
-    'desktop.tools.about': '정보',
-    'desktop.terminalPanel': '호스트 셸',
-    'desktop.terminalCollapse': '터미널 패널 접기',
-    'desktop.startButton': '시작',
-    'desktop.startMenu': '프로그램',
-    'desktop.app.terminal': '터미널',
-    'desktop.app.files': '파일 탐색',
-    'desktop.app.about': '정보',
-    'desktop.app.settings': '설정',
-    'desktop.iconHint':
-      '아이콘을 두 번 클릭하세요. 터미널: 실제 셸; 파일 탐색: Linux 파일 시스템(C 프로세스와 동일 권한).',
-    'desktop.shell.banner': '호스트 PTY — HostPC(C) 서버와 동일한 머신의 세션.',
-    'desktop.shell.connectFail': '[호스트] WebSocket /ws/shell 연결 실패.',
-    'desktop.shell.disconnected': '[호스트] 셸 세션이 종료되었습니다(끊김 또는 프로세스 종료).',
-    'desktop.shell.devHint':
-      '개발: OmniOS/backend에서 make run 으로 8080 실행 후 OmniOS/frontend에서 pnpm dev — Vite가 /ws를 8080으로 프록시합니다.',
-    'desktop.aboutTitle': 'OmniRoam 호스트 UI',
-    'desktop.aboutBody1':
-      '이 탭은 가벼운 그래픽 셸입니다. 드래그 가능한 창, 작업 표시줄, 콘솔 일부를 반영한 작은 도구를 제공합니다.',
-    'desktop.aboutBody2':
-      '원격 데스크톱은 이 HostPC의 /ws/vnc를 통해 로컬 TCP VNC(기본 127.0.0.1:5900)로 noVNC를 붙입니다. 오른쪽 터미널은 HostPC 머신의 /ws/shell입니다.',
-    'desktop.aboutLi1': '터미널 — WebSocket(/ws/shell)로 호스트의 실제 로그인 셸.',
-    'desktop.aboutLi2': '시스템 로그 — 플로팅 로그와 동일한 버퍼.',
-    'desktop.aboutLi3': '설정 — 카메라·시리얼·WebSocket 등 메인 설정 창을 엽니다.',
-    'desktop.aboutLi4': '파일 탐색 — /api/fs/list로 호스트 Linux 디렉터리 목록 및 업로드/다운로드/복사/이동/삭제.',
-    'fs.up': '위로',
-    'fs.refresh': '새로 고침',
-    'fs.upload': '업로드',
-    'fs.download': '다운로드',
-    'fs.delete': '삭제',
-    'fs.copy': '복사',
-    'fs.move': '이동',
-    'fs.paste': '붙여넣기',
-    'fs.selected': '선택:',
-    'fs.clipboardCopy': '복사:',
-    'fs.clipboardMove': '이동:',
-    'fs.copied': '클립보드에 복사했습니다.',
-    'fs.moved': '이동 준비됨. 대상 폴더에서 붙여넣으세요.',
-    'fs.pastedCopy': '복사 완료.',
-    'fs.pastedMove': '이동 완료.',
-    'fs.deleted': '삭제 완료.',
-    'fs.uploaded': '업로드 완료.',
-    'fs.operationFailed': '파일 작업 실패.',
-    'fs.confirmDelete': '{{name}} 삭제?',
-    'fs.path': '경로',
-    'fs.col.name': '이름',
-    'fs.col.type': '유형',
-    'fs.col.size': '크기',
-    'fs.col.mode': '권한',
-    'fs.col.modified': '수정 시각',
-    'fs.folder': '폴더',
-    'fs.file': '파일',
-    'fs.loading': '불러오는 중…',
-    'fs.empty': '(비어 있음)',
-    'fs.loadError': '이 폴더를 불러올 수 없습니다.',
-    'fs.unauthorized': '세션이 만료되었습니다. 다시 로그인하세요.',
-    'fs.truncated': '항목이 너무 많아 목록이 잘렸습니다.',
-    'fs.hint':
-      '폴더 행을 두 번 클릭하면 들어갑니다. HostPC C 프로세스 사용자 권한과 동일하며 일부 경로는 거부될 수 있습니다.',
-    'update.title': '소프트웨어 업데이트',
-    'update.available': '로컬 Git 체크아웃이 원격보다 뒤처져 있습니다. 변경 로그를 확인한 뒤 업데이트를 진행하세요.',
-    'update.shas': '로컬 {{local}} · 원격 {{remote}} ({{branch}})',
-    'update.changelog': '변경 로그 (GitHub)',
-    'update.noChangelog': '(변경 로그 없음 — 기본 브랜치에 CHANGELOG.md를 추가하거나 서버의 changelog 경로를 확인하세요.)',
-    'update.changelogFetchErr': '변경 로그를 불러오지 못했습니다:',
-    'update.gitErr': 'Git:',
-    'update.notConfigured':
-      '업데이트가 비활성화되어 있습니다. 서버에 HOSTPC_REPO_ROOT / -repo-root(및 보통 HOSTPC_GITHUB_REPO)를 설정하세요.',
-    'update.confirm': '계속',
-    'update.later': '나중에',
-    'update.countdownTitle': '재확인',
-    'update.countdownBody':
-      'git pull 후 웹 UI·C 바이너리를 다시 빌드하고 서비스를 재설치합니다(잠시 중단될 수 있음).',
-    'update.countdownWait': '{{n}}초 대기 — 카운트다운이 끝나야 확인 버튼이 활성화됩니다.',
-    'update.sureQuestion': '정말 업데이트하시겠습니까?',
-    'update.startDeploy': '업데이트 확인',
-    'update.cancel': '취소',
-    'update.deploying': '호스트 업데이트 중…',
-    'update.deployOk': '업데이트가 완료되었습니다. 서비스가 재시작되었을 수 있으니 연결이 끊기면 새로 고침하세요.',
-    'update.deployFail': '업데이트에 실패했습니다.',
-    'update.busy': '다른 업데이트가 이미 실행 중입니다.',
-    'update.checkNow': '업데이트 확인',
-    'update.checking': '확인 중…',
-    'update.upToDate': '이미 최신 버전입니다.',
-  },
 }
 
 //--------//
 // 模块：locale 读写 — localStorage、document.lang、t() 查表
 export function initLocale(): void {
   const s = localStorage.getItem(LS)
-  if (s === 'zh' || s === 'ko' || s === 'en') {
+  if (s === 'zh' || s === 'en') {
     locale.value = s
   }
 }
@@ -656,7 +442,7 @@ export function initLocale(): void {
 export function setLocale(l: Locale): void {
   locale.value = l
   localStorage.setItem(LS, l)
-  const htmlLang: Record<Locale, string> = { en: 'en', zh: 'zh-CN', ko: 'ko' }
+  const htmlLang: Record<Locale, string> = { en: 'en', zh: 'zh-CN' }
   if (typeof document !== 'undefined') {
     document.documentElement.lang = htmlLang[l]
   }

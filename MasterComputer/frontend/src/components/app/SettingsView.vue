@@ -85,7 +85,6 @@ function emitKeyboardEnabled(e: Event) {
         >
           <option value="en">{{ t('settings.lang.en') }}</option>
           <option value="zh">{{ t('settings.lang.zh') }}</option>
-          <option value="ko">{{ t('settings.lang.ko') }}</option>
         </select>
       </section>
 

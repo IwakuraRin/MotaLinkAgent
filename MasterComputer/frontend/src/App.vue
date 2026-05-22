@@ -616,7 +616,7 @@ async function loadSettingsPanelData() {
 }
 
 function onLangChange(v: Locale) {
-  if (v === 'en' || v === 'zh' || v === 'ko') setLocale(v)
+  if (v === 'en' || v === 'zh') setLocale(v)
 }
 
 function setSerialRole(role: SerialRoleKey, value: string) {
