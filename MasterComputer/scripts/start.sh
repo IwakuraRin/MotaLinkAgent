@@ -257,7 +257,14 @@ ensure_ros_workspace_built() {
     log "缺少 roslaunch，跳过 ROS 启动"
     return
   }
+  local need_build=0
   if ! rospack find "${AMSEOKBOT_ROS_PACKAGE}" >/dev/null 2>&1; then
+    need_build=1
+  fi
+  if [[ -f "${AMSEOKBOT_ROS_WS}/src/${AMSEOKBOT_ROS_PACKAGE}/scripts/yolo_obstacle_detector_ort.py" ]] && [[ ! -x "${AMSEOKBOT_ROS_WS}/devel/lib/${AMSEOKBOT_ROS_PACKAGE}/yolo_obstacle_detector_ort.py" ]]; then
+    need_build=1
+  fi
+  if [[ "${need_build}" -eq 1 ]]; then
     have_cmd catkin_make || die "缺少 catkin_make，无法构建 ROS 工作区"
     log "构建 ROS 工作区：${AMSEOKBOT_ROS_WS}"
     cd "${AMSEOKBOT_ROS_WS}"
