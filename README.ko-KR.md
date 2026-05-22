@@ -85,7 +85,7 @@ flowchart TB
 
 | 계층 | 경로 | 역할 |
 | --- | --- | --- |
-| C 제어 코어 | `MasterComputer/backend/` | 모터 제어, 시리얼 프로토콜, 섀시 이동, 로봇 팔 제어, 안전 제한, 로컬 명령 인터페이스. |
+| C 제어 코어 | `MasterComputer/backend/` | 모터 제어, 시리얼 프로토콜, 섀시 이동, 안전 제한, 로컬 명령 인터페이스. |
 | Go API 계층 | `MasterComputer/backend-go/` | HTTP API, 인증, 프론트엔드/모바일 통신, 설정, 파일 관리, C 제어 코어 호출. |
 | ROS 기능 계층 | `MasterComputer/ros/` | 운동학, 카메라 노드, YOLO 인식, 장애물 회피, 내비게이션 실험, 비디오 스트리밍. |
 | 프론트엔드 | `MasterComputer/frontend/` | 브라우저 기반 로봇 관리 인터페이스. |

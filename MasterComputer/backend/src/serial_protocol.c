@@ -2,7 +2,7 @@
 |--------------------------------------------------------------------------
 | 串口协议模块
 |--------------------------------------------------------------------------
-| 把底盘、机械臂和急停命令组装成下位机可以解析的文本协议帧。
+| 把底盘和急停命令组装成下位机可以解析的文本协议帧。
 |--------------------------------------------------------------------------
 */
 
@@ -19,17 +19,6 @@
 */
 void amseokbot_build_chassis_frame(const amseokbot_wheel_speed_t *speed, amseokbot_serial_frame_t *frame) {
     snprintf(frame->text, sizeof(frame->text), "CHASSIS_WHEEL_OMEGA %.6f %.6f %.6f", speed->right_front_radps, speed->left_front_radps, speed->rear_radps);
-}
-
-/*
-|--------------------------------------------------------------------------
-| 机械臂协议帧
-|--------------------------------------------------------------------------
-| 输出四个关节目标角度，具体闭环控制由下位机和驱动器负责。
-|--------------------------------------------------------------------------
-*/
-void amseokbot_build_arm_frame(const amseokbot_arm_command_t *command, amseokbot_serial_frame_t *frame) {
-    snprintf(frame->text, sizeof(frame->text), "ARM_JOINT_DEG %.3f %.3f %.3f %.3f", command->shoulder_yaw_deg, command->shoulder_pitch_deg, command->elbow_deg, command->wrist_deg);
 }
 
 /*

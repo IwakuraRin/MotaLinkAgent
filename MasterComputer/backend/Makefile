@@ -11,7 +11,6 @@ SRC := \
 	src/main.c \
 	src/safety_guard.c \
 	src/chassis_control.c \
-	src/arm_control.c \
 	src/motor_control.c \
 	src/serial_protocol.c \
 	src/file_management.c
@@ -31,7 +30,6 @@ run: $(TARGET)
 
 demo: $(TARGET)
 	./$(TARGET) chassis --vx 0.2 --vy 0 --wz 0
-	./$(TARGET) arm --shoulder-yaw 0 --shoulder-pitch 30 --elbow 45 --wrist 0
 	./$(TARGET) stop
 
 clean:

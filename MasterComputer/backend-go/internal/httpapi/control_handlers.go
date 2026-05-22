@@ -48,29 +48,6 @@ func (s *Server) handleControlChassisMove(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, result)
 }
 
-// ==================== 机械臂控制接口 ====================
-// 作用：接收四关节目标角度，调用 C 层做安全限幅并生成下位机协议帧。
-// ====================================================
-func (s *Server) handleControlArmJoints(w http.ResponseWriter, r *http.Request) {
-	if !method(w, r, http.MethodPost) {
-		return
-	}
-	if _, ok := s.requireAuth(w, r); !ok {
-		return
-	}
-	var req control.ArmCommand
-	if err := readJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid arm command")
-		return
-	}
-	result, err := control.NewClient(s.cfg.ControlCore).MoveArm(r.Context(), req)
-	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
-}
-
 // ==================== 停止控制接口 ====================
 // 作用：向 C 层请求停止协议帧，后续接入真实串口后用于急停和安全停机。
 // ====================================================

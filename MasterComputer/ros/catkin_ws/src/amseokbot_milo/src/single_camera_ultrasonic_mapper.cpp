@@ -19,7 +19,7 @@
 #include <sensor_msgs/Image.h>
 #include <std_msgs/UInt16.h>
 
-namespace simple_robotic_arm {
+namespace amseokbot_milo {
 
 /*
 |--------------------------------------------------------------------------
@@ -256,7 +256,7 @@ class SingleCameraUltrasonicMapperNode {
   ros::Time last_map_update_;
 };
 
-}  // namespace simple_robotic_arm
+}  // namespace amseokbot_milo
 
 /*
 |--------------------------------------------------------------------------
@@ -267,7 +267,7 @@ class SingleCameraUltrasonicMapperNode {
 */
 int main(int argc, char** argv) {
   ros::init(argc, argv, "single_camera_ultrasonic_mapper");
-  simple_robotic_arm::SingleCameraUltrasonicMapperNode node;
+  amseokbot_milo::SingleCameraUltrasonicMapperNode node;
   ros::spin();
   return 0;
 }

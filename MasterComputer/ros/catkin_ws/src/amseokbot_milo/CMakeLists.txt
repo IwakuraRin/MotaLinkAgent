@@ -1,6 +1,6 @@
-# simple_robotic_arm/ — AmseokBot-Milo 的 ROS1 C++ 节点包。
+# amseokbot_milo/ — AmseokBot-Milo 的 ROS1 C++ 节点包。
 cmake_minimum_required(VERSION 3.0.2)
-project(simple_robotic_arm)
+project(amseokbot_milo)
 
 add_compile_options(-std=c++14 -Wall -Wextra)
 
@@ -28,7 +28,6 @@ include_directories(
 # 作用：所有 ROS 运行节点统一使用 C++ 编译产物，不再安装 Python 脚本。
 # ==========================================================
 set(AMSEOKBOT_ROS_NODES
-  arm_kinematics
   atmega_serial_bridge
   chassis_kinematics
   line_follow_vision

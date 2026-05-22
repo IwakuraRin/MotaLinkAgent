@@ -17,7 +17,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 
-namespace simple_robotic_arm {
+namespace amseokbot_milo {
 
 double clampValue(double value, double low, double high) {
   return std::max(low, std::min(high, value));
@@ -239,11 +239,11 @@ class OpenCVObstacleAvoidanceNode {
   bool last_blocked_ = false;
 };
 
-}  // namespace simple_robotic_arm
+}  // namespace amseokbot_milo
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "opencv_obstacle_avoidance");
-  simple_robotic_arm::OpenCVObstacleAvoidanceNode node;
+  amseokbot_milo::OpenCVObstacleAvoidanceNode node;
   ros::spin();
   return 0;
 }

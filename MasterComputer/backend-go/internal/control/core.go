@@ -26,19 +26,12 @@ func NewClient(binaryPath string) Client {
 }
 
 // ==================== 控制命令结构 ====================
-// 作用：描述 Go API 接收的底盘、机械臂和 C 核心返回结果。
+// 作用：描述 Go API 接收的底盘和 C 核心返回结果。
 // ====================================================
 type ChassisCommand struct {
 	VXMps   float64 `json:"vx_mps"`
 	VYMps   float64 `json:"vy_mps"`
 	WZRadps float64 `json:"wz_radps"`
-}
-
-type ArmCommand struct {
-	ShoulderYawDeg   float64 `json:"shoulder_yaw_deg"`
-	ShoulderPitchDeg float64 `json:"shoulder_pitch_deg"`
-	ElbowDeg         float64 `json:"elbow_deg"`
-	WristDeg         float64 `json:"wrist_deg"`
 }
 
 type Result map[string]any
@@ -135,13 +128,6 @@ func (c Client) Health(ctx context.Context) (Result, error) {
 // ====================================================
 func (c Client) MoveChassis(ctx context.Context, command ChassisCommand) (Result, error) {
 	return c.run(ctx, "chassis", "--vx", formatFloat(command.VXMps), "--vy", formatFloat(command.VYMps), "--wz", formatFloat(command.WZRadps))
-}
-
-// ==================== 机械臂关节命令 ====================
-// 作用：把肩部、肘部和腕部目标角度交给 C 层限幅并组包。
-// ======================================================
-func (c Client) MoveArm(ctx context.Context, command ArmCommand) (Result, error) {
-	return c.run(ctx, "arm", "--shoulder-yaw", formatFloat(command.ShoulderYawDeg), "--shoulder-pitch", formatFloat(command.ShoulderPitchDeg), "--elbow", formatFloat(command.ElbowDeg), "--wrist", formatFloat(command.WristDeg))
 }
 
 // ==================== 停止命令 ====================

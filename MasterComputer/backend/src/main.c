@@ -2,7 +2,7 @@
 |--------------------------------------------------------------------------
 | AmseokBot C 控制核心入口
 |--------------------------------------------------------------------------
-| 提供底盘、机械臂、急停和健康检查命令。Go API 通过本地进程调用它，
+| 提供底盘、急停、文件管理和健康检查命令。Go API 通过本地进程调用它，
 | 后续也可以替换成本地 socket 或静态库接口。
 |--------------------------------------------------------------------------
 */
@@ -21,7 +21,7 @@
 |--------------------------------------------------------------------------
 */
 void amseokbot_print_health_json(void) {
-    printf("{\"ok\":true,\"service\":\"amseokbot-control-core\",\"roles\":[\"motor\",\"serial\",\"chassis\",\"arm\",\"safety\"]}\n");
+    printf("{\"ok\":true,\"service\":\"amseokbot-control-core\",\"roles\":[\"motor\",\"serial\",\"chassis\",\"safety\"]}\n");
 }
 
 void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, const amseokbot_wheel_speed_t *speed, const amseokbot_serial_frame_t *frame) {
@@ -32,15 +32,6 @@ void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, co
         speed->right_front_radps,
         speed->left_front_radps,
         speed->rear_radps,
-        frame->text);
-}
-
-void amseokbot_print_arm_json(const amseokbot_arm_command_t *command, const amseokbot_serial_frame_t *frame) {
-    printf("{\"ok\":true,\"type\":\"arm\",\"joint_deg\":{\"shoulder_yaw\":%.3f,\"shoulder_pitch\":%.3f,\"elbow\":%.3f,\"wrist\":%.3f},\"serial_frame\":\"%s\"}\n",
-        command->shoulder_yaw_deg,
-        command->shoulder_pitch_deg,
-        command->elbow_deg,
-        command->wrist_deg,
         frame->text);
 }
 
@@ -134,7 +125,6 @@ static int print_usage(void) {
     fprintf(stderr, "usage:\n");
     fprintf(stderr, "  amseokbot-control-core health\n");
     fprintf(stderr, "  amseokbot-control-core chassis --vx 0.1 --vy 0 --wz 0\n");
-    fprintf(stderr, "  amseokbot-control-core arm --shoulder-yaw 0 --shoulder-pitch 20 --elbow 30 --wrist 0\n");
     fprintf(stderr, "  amseokbot-control-core stop\n");
     return 2;
 }
@@ -143,7 +133,7 @@ static int print_usage(void) {
 |--------------------------------------------------------------------------
 | 程序入口
 |--------------------------------------------------------------------------
-| 分发健康检查、底盘控制、机械臂控制和停止命令。
+| 分发健康检查、底盘控制、文件管理和停止命令。
 |--------------------------------------------------------------------------
 */
 int main(int argc, char **argv) {
@@ -173,25 +163,6 @@ int main(int argc, char **argv) {
         amseokbot_print_chassis_json(&command, &speed, &frame);
         return 0;
     }
-
-    if (strcmp(argv[1], "arm") == 0) {
-        char error[128] = {0};
-        amseokbot_arm_command_t command = {
-            .shoulder_yaw_deg = read_number_arg(argc, argv, "--shoulder-yaw", 0.0),
-            .shoulder_pitch_deg = read_number_arg(argc, argv, "--shoulder-pitch", 0.0),
-            .elbow_deg = read_number_arg(argc, argv, "--elbow", 0.0),
-            .wrist_deg = read_number_arg(argc, argv, "--wrist", 0.0),
-        };
-        if (!amseokbot_check_arm_command(&command, error, sizeof(error))) {
-            fprintf(stderr, "%s\n", error);
-            return 1;
-        }
-        amseokbot_serial_frame_t frame = {0};
-        amseokbot_build_arm_frame(&command, &frame);
-        amseokbot_print_arm_json(&command, &frame);
-        return 0;
-    }
-
 
     if (strcmp(argv[1], "fs") == 0) {
         char error[256] = {0};

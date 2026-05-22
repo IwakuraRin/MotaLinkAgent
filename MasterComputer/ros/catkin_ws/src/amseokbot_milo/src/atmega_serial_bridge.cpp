@@ -21,7 +21,7 @@
 #include <std_msgs/String.h>
 #include <std_msgs/UInt16.h>
 
-namespace simple_robotic_arm {
+namespace amseokbot_milo {
 
 /*
 |--------------------------------------------------------------------------
@@ -275,7 +275,7 @@ class AtmegaSerialBridgeNode {
   bool append_newline_ = true;
 };
 
-}  // namespace simple_robotic_arm
+}  // namespace amseokbot_milo
 
 /*
 |--------------------------------------------------------------------------
@@ -286,7 +286,7 @@ class AtmegaSerialBridgeNode {
 */
 int main(int argc, char** argv) {
   ros::init(argc, argv, "atmega_serial_bridge");
-  simple_robotic_arm::AtmegaSerialBridgeNode node;
+  amseokbot_milo::AtmegaSerialBridgeNode node;
   ros::spin();
   return 0;
 }

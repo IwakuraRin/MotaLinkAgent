@@ -20,7 +20,7 @@ AmseokBot Milo 是机器人上位机与下位机软件仓库。
 
 `SlaveDevice` 为下位机仓库，主要是基于 ATmega 的下位机 C++ 程序。
 
-AmseokBot-Milo 是一个基于 ROS 1 开发的家用陪伴型机器人软件栈，集成图像识别、YOLO 调试画面、自动避障、底盘运动控制、机械臂控制、文件管理、SSH 维护终端和浏览器后台管理界面。
+AmseokBot-Milo 是一个基于 ROS 1 开发的家用陪伴型机器人软件栈，集成图像识别、YOLO 调试画面、自动避障、底盘运动控制、文件管理、SSH 维护终端和浏览器后台管理界面。
 
 ## 功能定位
 
@@ -86,7 +86,7 @@ flowchart TB
 
 | 分层 | 路径 | 职责 |
 | --- | --- | --- |
-| C 控制核心 | `MasterComputer/backend/` | 电机控制、串口协议、底盘运动、机械臂控制、安全限幅、本地命令接口。 |
+| C 控制核心 | `MasterComputer/backend/` | 电机控制、串口协议、底盘运动、安全限幅、本地命令接口。 |
 | Go API 层 | `MasterComputer/backend-go/` | HTTP API、登录鉴权、前端/手机通信、配置管理、文件管理、调用 C 控制核心。 |
 | ROS 能力层 | `MasterComputer/ros/` | 运动学、摄像头节点、YOLO 识别、自动避障、导航实验和视频推流。 |
 | 前端 | `MasterComputer/frontend/` | 基于浏览器的机器人后台管理界面。 |

@@ -16,7 +16,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 
-namespace simple_robotic_arm {
+namespace amseokbot_milo {
 
 double clampValue(double value, double low, double high) {
   return std::max(low, std::min(high, value));
@@ -168,11 +168,11 @@ class LineFollowVisionNode {
   double obs_dark_ratio_ = 0.35;
 };
 
-}  // namespace simple_robotic_arm
+}  // namespace amseokbot_milo
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "line_follow_vision");
-  simple_robotic_arm::LineFollowVisionNode node;
+  amseokbot_milo::LineFollowVisionNode node;
   ros::spin();
   return 0;
 }

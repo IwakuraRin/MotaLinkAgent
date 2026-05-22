@@ -21,7 +21,7 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/String.h>
 
-namespace simple_robotic_arm {
+namespace amseokbot_milo {
 
 /*
 |--------------------------------------------------------------------------
@@ -228,7 +228,7 @@ class ChassisKinematicsNode {
   bool obstacle_stop_ = false;
 };
 
-}  // namespace simple_robotic_arm
+}  // namespace amseokbot_milo
 
 /*
 |--------------------------------------------------------------------------
@@ -239,7 +239,7 @@ class ChassisKinematicsNode {
 */
 int main(int argc, char** argv) {
   ros::init(argc, argv, "chassis_kinematics");
-  simple_robotic_arm::ChassisKinematicsNode node;
+  amseokbot_milo::ChassisKinematicsNode node;
   ros::spin();
   return 0;
 }

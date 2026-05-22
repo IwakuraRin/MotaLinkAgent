@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <!--
-  simple_robotic_arm：位于 catkin_ws/src/ 下的 ROS 1 包，依赖与元数据在此声明。
+  amseokbot_milo：位于 catkin_ws/src/ 下的 ROS 1 包，依赖与元数据在此声明。
   工作区目录含义见仓库根目录 setup_ros1.bash 顶部注释。
 -->
 <package format="2">
-  <name>simple_robotic_arm</name>
+  <name>amseokbot_milo</name>
   <version>0.0.0</version>
-  <description>ROS 1 stack for OmniRoam: tri-omni mobile base with onboard robotic arm.</description>
+  <description>ROS 1 stack for OmniRoam: tri-omni mobile base with vision and obstacle avoidance.</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -23,7 +23,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/simple_robotic_arm</url> -->
+  <!-- <url type="website">http://wiki.ros.org/amseokbot_milo</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->

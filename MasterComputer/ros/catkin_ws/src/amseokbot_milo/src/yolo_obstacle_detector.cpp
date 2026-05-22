@@ -19,7 +19,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 
-namespace simple_robotic_arm {
+namespace amseokbot_milo {
 
 /*
 |--------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class YoloObstacleDetectorNode {
   }
 
   void loadParams() {
-    const std::string package_path = ros::package::getPath("simple_robotic_arm");
+    const std::string package_path = ros::package::getPath("amseokbot_milo");
     const std::string default_model = package_path + "/models/obstacle_yolo11n.onnx";
     private_nh_.param<std::string>("image_topic", image_topic_, "/usb_cam/image_raw");
     private_nh_.param<std::string>("debug_image_topic", debug_topic_, "/obstacle_detector/debug");
@@ -237,11 +237,11 @@ class YoloObstacleDetectorNode {
   double last_fps_ = 0.0;
 };
 
-}  // namespace simple_robotic_arm
+}  // namespace amseokbot_milo
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "yolo_obstacle_detector");
-  simple_robotic_arm::YoloObstacleDetectorNode node;
+  amseokbot_milo::YoloObstacleDetectorNode node;
   ros::spin();
   return 0;
 }

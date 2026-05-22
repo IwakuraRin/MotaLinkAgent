@@ -19,7 +19,7 @@
   <arg name="command_timeout_s" default="0.35"/>
   <arg name="twist_filter_tau_s" default="0.08"/>
 
-  <node pkg="simple_robotic_arm" type="chassis_kinematics" name="chassis_kinematics" output="screen">
+  <node pkg="amseokbot_milo" type="chassis_kinematics" name="chassis_kinematics" output="screen">
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
     <param name="wheel_omega_topic" value="$(arg wheel_omega_topic)"/>
     <param name="serial_tx_topic" value="$(arg serial_tx_topic)"/>

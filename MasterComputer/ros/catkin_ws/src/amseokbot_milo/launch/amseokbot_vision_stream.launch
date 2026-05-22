@@ -14,7 +14,7 @@
   <!-- ==================== YOLO 检测输出 ==================== -->
   <!-- 作用：把检测框绘制到调试图并发布给 web_video_server。 -->
   <arg name="debug_image_topic" default="/obstacle_detector/debug"/>
-  <arg name="model_path" default="$(find simple_robotic_arm)/models/obstacle_yolo11n_192.onnx"/>
+  <arg name="model_path" default="$(find amseokbot_milo)/models/obstacle_yolo11n_192.onnx"/>
   <arg name="input_size" default="192"/>
   <arg name="conf_thresh" default="0.05"/>
   <arg name="nms_thresh" default="0.45"/>
@@ -37,14 +37,14 @@
   <arg name="map_topic" default="/mapping/local_occupancy"/>
 
   <group if="$(arg start_atmega_bridge)">
-    <include file="$(find simple_robotic_arm)/launch/atmega_serial_bridge.launch">
+    <include file="$(find amseokbot_milo)/launch/atmega_serial_bridge.launch">
       <arg name="port" value="$(arg atmega_port)"/>
       <arg name="baud" value="$(arg atmega_baud)"/>
       <arg name="front_range_topic" value="$(arg front_range_topic)"/>
     </include>
   </group>
 
-  <include file="$(find simple_robotic_arm)/launch/usb_camera_web.launch">
+  <include file="$(find amseokbot_milo)/launch/usb_camera_web.launch">
     <arg name="video_device" value="$(arg video_device)"/>
     <arg name="image_width" value="$(arg image_width)"/>
     <arg name="image_height" value="$(arg image_height)"/>
@@ -55,7 +55,7 @@
     <arg name="web_video_address" value="$(arg web_video_address)"/>
   </include>
 
-  <include file="$(find simple_robotic_arm)/launch/yolo_obstacle_detector.launch">
+  <include file="$(find amseokbot_milo)/launch/yolo_obstacle_detector.launch">
     <arg name="image_topic" value="$(arg image_topic)"/>
     <arg name="debug_image_topic" value="$(arg debug_image_topic)"/>
     <arg name="model_path" value="$(arg model_path)"/>
@@ -68,7 +68,7 @@
   </include>
 
   <group if="$(arg start_mapping)">
-    <include file="$(find simple_robotic_arm)/launch/single_camera_ultrasonic_mapper.launch">
+    <include file="$(find amseokbot_milo)/launch/single_camera_ultrasonic_mapper.launch">
       <arg name="image_topic" value="$(arg image_topic)"/>
       <arg name="front_range_topic" value="$(arg front_range_topic)"/>
       <arg name="map_topic" value="$(arg map_topic)"/>

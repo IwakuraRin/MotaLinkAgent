@@ -36,7 +36,7 @@
   </node>
 
   <group if="$(arg start_line_follow)">
-    <node pkg="simple_robotic_arm" type="line_follow_vision" name="line_follow_vision" output="screen">
+    <node pkg="amseokbot_milo" type="line_follow_vision" name="line_follow_vision" output="screen">
       <param name="image_topic" value="$(arg image_topic)"/>
       <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
       <param name="publish_debug_image" value="$(arg publish_debug_image)"/>

@@ -56,7 +56,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/serial/devices", s.handleSerialDevices)
 	s.mux.HandleFunc("/api/control/health", s.handleControlHealth)
 	s.mux.HandleFunc("/api/control/chassis/move", s.handleControlChassisMove)
-	s.mux.HandleFunc("/api/control/arm/joints", s.handleControlArmJoints)
 	s.mux.HandleFunc("/api/control/stop", s.handleControlStop)
 	s.mux.HandleFunc("/api/fs/list", s.handleFSList)
 	s.mux.HandleFunc("/api/fs/upload", s.handleFSUpload)

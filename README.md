@@ -85,7 +85,7 @@ flowchart TB
 
 | Layer | Path | Responsibility |
 | --- | --- | --- |
-| C control core | `MasterComputer/backend/` | Motor control, serial protocol, chassis motion, arm control, safety limits, local command interface. |
+| C control core | `MasterComputer/backend/` | Motor control, serial protocol, chassis motion, safety limits, local command interface. |
 | Go API layer | `MasterComputer/backend-go/` | HTTP API, authentication, frontend/mobile communication, settings, file management, and calling the C control core. |
 | ROS capability layer | `MasterComputer/ros/` | Kinematics, camera nodes, YOLO perception, obstacle avoidance, navigation experiments, and video streaming. |
 | Frontend | `MasterComputer/frontend/` | Browser based robot administration interface. |

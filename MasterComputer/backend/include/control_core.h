@@ -2,7 +2,7 @@
 |--------------------------------------------------------------------------
 | AmseokBot C 控制核心公共接口
 |--------------------------------------------------------------------------
-| 声明电机控制、串口协议、底盘运动、机械臂控制和安全保护使用的数据结构。
+| 声明电机控制、串口协议、底盘运动和安全保护使用的数据结构。
 | C 层只处理低延迟硬件相关逻辑，不再承载 HTTP、登录和前端文件服务。
 |--------------------------------------------------------------------------
 */
@@ -55,20 +55,6 @@ typedef struct {
 
 /*
 |--------------------------------------------------------------------------
-| 机械臂关节命令
-|--------------------------------------------------------------------------
-| 保存肩部双电机、肘部电机和腕部电机的目标角度。
-|--------------------------------------------------------------------------
-*/
-typedef struct {
-    double shoulder_yaw_deg;
-    double shoulder_pitch_deg;
-    double elbow_deg;
-    double wrist_deg;
-} amseokbot_arm_command_t;
-
-/*
-|--------------------------------------------------------------------------
 | 串口协议帧
 |--------------------------------------------------------------------------
 | 保存要发送给下位机的文本协议帧，Go 层后续可以把它写入串口。
@@ -79,14 +65,11 @@ typedef struct {
 } amseokbot_serial_frame_t;
 
 bool amseokbot_check_chassis_command(amseokbot_chassis_command_t *command, char *error, size_t error_size);
-bool amseokbot_check_arm_command(amseokbot_arm_command_t *command, char *error, size_t error_size);
 amseokbot_wheel_speed_t amseokbot_compute_wheel_speed(const amseokbot_chassis_command_t *command);
 void amseokbot_build_chassis_frame(const amseokbot_wheel_speed_t *speed, amseokbot_serial_frame_t *frame);
-void amseokbot_build_arm_frame(const amseokbot_arm_command_t *command, amseokbot_serial_frame_t *frame);
 void amseokbot_build_stop_frame(amseokbot_serial_frame_t *frame);
 void amseokbot_print_health_json(void);
 void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, const amseokbot_wheel_speed_t *speed, const amseokbot_serial_frame_t *frame);
-void amseokbot_print_arm_json(const amseokbot_arm_command_t *command, const amseokbot_serial_frame_t *frame);
 void amseokbot_print_stop_json(const amseokbot_serial_frame_t *frame);
 
 
