@@ -57,12 +57,12 @@ onMounted(() => void bindVideo())
           <img
             v-if="cameraSrc && cameraUseImage"
             :src="cameraSrc"
-            class="h-full w-full object-fill"
+            class="h-full w-full object-contain"
             alt=""
             @load="emit('mediaBound')"
             @error="emit('mediaError')"
           />
-          <video v-else-if="cameraSrc" ref="videoRef" class="h-full w-full object-fill" playsinline autoplay muted />
+          <video v-else-if="cameraSrc" ref="videoRef" class="h-full w-full object-contain" playsinline autoplay muted />
           <div v-else class="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center text-pve-muted">
             <div class="h-32 w-full max-w-md border border-dashed border-pve-border bg-pve-panel/50" />
             <p class="max-w-sm font-mono text-xs">

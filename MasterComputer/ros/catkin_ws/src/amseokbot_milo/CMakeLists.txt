@@ -5,6 +5,7 @@ project(amseokbot_milo)
 add_compile_options(-std=c++14 -Wall -Wextra)
 
 find_package(catkin REQUIRED COMPONENTS
+  rospy
   roscpp
   roslib
   std_msgs
@@ -16,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(OpenCV REQUIRED)
 
 catkin_package(
-  CATKIN_DEPENDS roscpp roslib std_msgs sensor_msgs geometry_msgs nav_msgs cv_bridge
+  CATKIN_DEPENDS rospy roscpp roslib std_msgs sensor_msgs geometry_msgs nav_msgs cv_bridge
 )
 
 include_directories(
@@ -25,7 +26,7 @@ include_directories(
 )
 
 # ==================== C++ ROS 节点目标 ====================
-# 作用：所有 ROS 运行节点统一使用 C++ 编译产物，不再安装 Python 脚本。
+# 作用：底盘、建图和串口节点使用 C++，YOLO ONNX 推理脚本使用 ONNX Runtime。
 # ==========================================================
 set(AMSEOKBOT_ROS_NODES
   atmega_serial_bridge
@@ -42,6 +43,11 @@ foreach(node_name ${AMSEOKBOT_ROS_NODES})
   add_dependencies(${node_name} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
   target_link_libraries(${node_name} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 endforeach()
+
+catkin_install_python(PROGRAMS
+  scripts/yolo_obstacle_detector_ort.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 install(TARGETS ${AMSEOKBOT_ROS_NODES}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

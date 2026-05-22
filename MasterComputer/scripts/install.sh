@@ -25,9 +25,9 @@ install_apt_packages() {
     return
   fi
   have_cmd apt-get || die "当前系统没有 apt-get；此脚本优先支持 Ubuntu/Debian"
-  log "安装基础依赖：git curl ca-certificates build-essential gcc make golang-go nodejs npm"
+  log "安装基础依赖：git curl ca-certificates build-essential gcc make golang-go nodejs npm python3-pip"
   as_root apt-get update
-  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y git curl ca-certificates build-essential gcc make golang-go nodejs npm openssl
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y git curl ca-certificates build-essential gcc make golang-go nodejs npm openssl python3-pip python3-numpy
 }
 
 install_pnpm() {
@@ -44,6 +44,20 @@ install_pnpm() {
   have_cmd npm || die "缺少 npm，无法安装 pnpm"
   log "通过 npm 安装 pnpm@9.15.0"
   as_root npm install -g pnpm@9.15.0
+}
+
+install_python_runtime() {
+  if python3 - <<'PY_CHECK' >/dev/null 2>&1
+import onnxruntime
+PY_CHECK
+  then
+    log "onnxruntime 已存在"
+    return
+  fi
+  have_cmd python3 || die "缺少 python3，无法安装 YOLO ONNX Runtime"
+  have_cmd pip3 || die "缺少 pip3，无法安装 YOLO ONNX Runtime"
+  log "安装 YOLO ONNX Runtime：onnxruntime"
+  python3 -m pip install --user onnxruntime==1.16.3
 }
 
 # ==================== 本机配置生成 ====================
@@ -86,6 +100,7 @@ main() {
   require_repo
   install_apt_packages
   install_pnpm
+  install_python_runtime
   write_env_file
   "${SCRIPT_DIR}/build.sh"
   log "安装完成。启动服务：MasterComputer/scripts/start.sh；注册开机自启：MasterComputer/scripts/service-install.sh"
