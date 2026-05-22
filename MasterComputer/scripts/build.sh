@@ -23,6 +23,7 @@ check_build_tools() {
 # ==================================================
 build_control_core() {
   log "构建 C 控制核心"
+  make -C "${AMSEOKBOT_MASTER_DIR}/backend" clean
   make -C "${AMSEOKBOT_MASTER_DIR}/backend"
 }
 
@@ -31,6 +32,7 @@ build_control_core() {
 # ================================================
 build_go_api() {
   log "构建 Go API"
+  make -C "${AMSEOKBOT_MASTER_DIR}/backend-go" clean
   make -C "${AMSEOKBOT_MASTER_DIR}/backend-go"
 }
 

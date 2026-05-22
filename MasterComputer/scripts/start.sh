@@ -114,8 +114,19 @@ check_environment() {
 # 作用：确认二进制和前端产物存在，不存在时自动构建。
 # ==================================================
 ensure_built() {
+  local rebuild=0
   if [[ ! -x "${AMSEOKBOT_API_BIN}" || ! -x "${AMSEOKBOT_CONTROL_CORE}" || ! -f "${AMSEOKBOT_STATIC_DIR}/index.html" ]]; then
-    log "缺少构建产物，开始自动构建"
+    rebuild=1
+  elif ! "${AMSEOKBOT_API_BIN}" -h >/dev/null 2>&1; then
+    log "Go API 二进制无法在当前系统运行，将本机重建"
+    rebuild=1
+  elif ! "${AMSEOKBOT_CONTROL_CORE}" health >/dev/null 2>&1; then
+    log "C 控制核心无法在当前系统运行，将本机重建"
+    rebuild=1
+  fi
+
+  if [[ "${rebuild}" -eq 1 ]]; then
+    log "需要本机构建产物，开始自动构建"
     "${AMSEOKBOT_MASTER_DIR}/scripts/build.sh"
   else
     log "构建产物已存在"
@@ -303,6 +314,7 @@ start_background() {
   fi
   log "后台启动 Go API：${AMSEOKBOT_API_ADDR}"
   cd "${AMSEOKBOT_REPO_DIR}"
+  : >"${AMSEOKBOT_API_LOG}"
   nohup "${AMSEOKBOT_API_BIN}" $(api_args) >>"${AMSEOKBOT_API_LOG}" 2>&1 &
   printf '%s\n' "$!" >"${AMSEOKBOT_PID_FILE}"
   log "已启动，PID=$(cat "${AMSEOKBOT_PID_FILE}")，日志：${AMSEOKBOT_API_LOG}"
