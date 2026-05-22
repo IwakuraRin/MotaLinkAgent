@@ -35,6 +35,9 @@
   <arg name="atmega_baud" default="115200"/>
   <arg name="front_range_topic" default="/safety/front_range_mm"/>
   <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>
+  <arg name="odom_topic" default="/odom"/>
+  <arg name="start_wheel_odometry" default="true"/>
+  <arg name="wheel_feedback_scale" default="100.0"/>
   <arg name="status_poll_rate_hz" default="20.0"/>
   <arg name="map_topic" default="/mapping/local_occupancy"/>
 
@@ -45,6 +48,14 @@
       <arg name="front_range_topic" value="$(arg front_range_topic)"/>
       <arg name="wheel_feedback_topic" value="$(arg wheel_feedback_topic)"/>
       <arg name="status_poll_rate_hz" value="$(arg status_poll_rate_hz)"/>
+    </include>
+  </group>
+
+  <group if="$(arg start_wheel_odometry)">
+    <include file="$(find amseokbot_milo)/launch/wheel_odometry.launch">
+      <arg name="wheel_feedback_topic" value="$(arg wheel_feedback_topic)"/>
+      <arg name="odom_topic" value="$(arg odom_topic)"/>
+      <arg name="wheel_feedback_scale" value="$(arg wheel_feedback_scale)"/>
     </include>
   </group>
 
@@ -75,6 +86,7 @@
     <include file="$(find amseokbot_milo)/launch/single_camera_ultrasonic_mapper.launch">
       <arg name="image_topic" value="$(arg image_topic)"/>
       <arg name="front_range_topic" value="$(arg front_range_topic)"/>
+      <arg name="odom_topic" value="$(arg odom_topic)"/>
       <arg name="map_topic" value="$(arg map_topic)"/>
     </include>
   </group>

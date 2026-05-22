@@ -14,10 +14,12 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/Odometry.h>
 #include <opencv2/imgproc.hpp>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <std_msgs/UInt16.h>
+#include <tf/transform_datatypes.h>
 
 namespace amseokbot_milo {
 
@@ -38,6 +40,7 @@ struct MapperConfig {
   uint16_t min_range_mm = 60;
   uint16_t max_range_mm = 2500;
   double range_timeout_s = 0.5;
+  double odom_timeout_s = 0.5;
   double publish_rate_hz = 5.0;
   int occupied_value = 100;
   int free_value = 0;
@@ -103,13 +106,13 @@ class LocalOccupancyMap {
   explicit LocalOccupancyMap(const MapperConfig& config) : config_(config) {
     width_ = std::max(1, static_cast<int>(std::round(config_.forward_length_m / config_.resolution_m)));
     height_ = std::max(1, static_cast<int>(std::round(config_.side_width_m / config_.resolution_m)));
+    origin_x_ = -config_.forward_length_m * 0.5;
+    origin_y_ = -config_.side_width_m * 0.5;
     data_.assign(static_cast<std::size_t>(width_ * height_), static_cast<int8_t>(config_.unknown_value));
   }
 
-  void integrate(double range_m, double bearing_rad) {
-    const double hit_x = range_m * std::cos(bearing_rad);
-    const double hit_y = range_m * std::sin(bearing_rad);
-    markRay(hit_x, hit_y);
+  void integrate(double robot_x, double robot_y, double hit_x, double hit_y) {
+    markRay(robot_x, robot_y, hit_x, hit_y);
     markCell(hit_x, hit_y, static_cast<int8_t>(config_.occupied_value));
   }
 
@@ -120,8 +123,8 @@ class LocalOccupancyMap {
     grid.info.resolution = static_cast<float>(config_.resolution_m);
     grid.info.width = static_cast<uint32_t>(width_);
     grid.info.height = static_cast<uint32_t>(height_);
-    grid.info.origin.position.x = 0.0;
-    grid.info.origin.position.y = -config_.side_width_m * 0.5;
+    grid.info.origin.position.x = origin_x_;
+    grid.info.origin.position.y = origin_y_;
     grid.info.origin.position.z = 0.0;
     grid.info.origin.orientation.w = 1.0;
     grid.data = data_;
@@ -130,8 +133,8 @@ class LocalOccupancyMap {
 
  private:
   bool worldToCell(double x, double y, int& ix, int& iy) const {
-    ix = static_cast<int>(std::floor(x / config_.resolution_m));
-    iy = static_cast<int>(std::floor((y + config_.side_width_m * 0.5) / config_.resolution_m));
+    ix = static_cast<int>(std::floor((x - origin_x_) / config_.resolution_m));
+    iy = static_cast<int>(std::floor((y - origin_y_) / config_.resolution_m));
     return ix >= 0 && ix < width_ && iy >= 0 && iy < height_;
   }
 
@@ -144,26 +147,37 @@ class LocalOccupancyMap {
     data_[static_cast<std::size_t>(iy * width_ + ix)] = value;
   }
 
-  void markRay(double hit_x, double hit_y) {
-    const double distance = std::sqrt(hit_x * hit_x + hit_y * hit_y);
+  void markRay(double start_x, double start_y, double hit_x, double hit_y) {
+    const double dx = hit_x - start_x;
+    const double dy = hit_y - start_y;
+    const double distance = std::sqrt(dx * dx + dy * dy);
     const int steps = std::max(1, static_cast<int>(distance / config_.resolution_m));
     for (int step = 0; step < steps; ++step) {
       const double t = static_cast<double>(step) / static_cast<double>(steps);
-      markCell(hit_x * t, hit_y * t, static_cast<int8_t>(config_.free_value));
+      markCell(start_x + dx * t, start_y + dy * t, static_cast<int8_t>(config_.free_value));
     }
   }
 
   MapperConfig config_;
   int width_ = 0;
   int height_ = 0;
+  double origin_x_ = 0.0;
+  double origin_y_ = 0.0;
   std::vector<int8_t> data_;
+};
+
+struct RobotPose2D {
+  double x = 0.0;
+  double y = 0.0;
+  double yaw = 0.0;
+  ros::Time stamp;
 };
 
 /*
 |--------------------------------------------------------------------------
 | 单目超声波建图节点
 |--------------------------------------------------------------------------
-| 订阅摄像头图像和下位机超声波距离，发布 /mapping/local_occupancy 局部栅格图。
+| 融合摄像头方位、超声波距离和霍尔轮速里程计 /odom，发布 odom 坐标系占据栅格。
 |--------------------------------------------------------------------------
 */
 class SingleCameraUltrasonicMapperNode {
@@ -172,15 +186,21 @@ class SingleCameraUltrasonicMapperNode {
       : private_nh_("~"), config_(loadConfig()), bearing_estimator_(config_), local_map_(config_) {
     private_nh_.param<std::string>("image_topic", image_topic_, "/usb_cam/image_raw");
     private_nh_.param<std::string>("front_range_topic", front_range_topic_, "/safety/front_range_mm");
+    private_nh_.param<std::string>("odom_topic", odom_topic_, "/odom");
     private_nh_.param<std::string>("map_topic", map_topic_, "/mapping/local_occupancy");
-    private_nh_.param<std::string>("map_frame", map_frame_, "base_link");
+    private_nh_.param<std::string>("map_frame", map_frame_, "odom");
 
     map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>(map_topic_, 1, true);
     image_sub_ = nh_.subscribe(image_topic_, 1, &SingleCameraUltrasonicMapperNode::handleImage, this);
     range_sub_ = nh_.subscribe(front_range_topic_, 10, &SingleCameraUltrasonicMapperNode::handleRange, this);
+    odom_sub_ = nh_.subscribe(odom_topic_, 20, &SingleCameraUltrasonicMapperNode::handleOdom, this);
     timer_ = nh_.createTimer(ros::Duration(1.0 / std::max(1.0, config_.publish_rate_hz)), &SingleCameraUltrasonicMapperNode::handleTimer, this);
 
-    ROS_INFO("single_camera_ultrasonic_mapper: image=%s range=%s map=%s", image_topic_.c_str(), front_range_topic_.c_str(), map_topic_.c_str());
+    ROS_INFO("single_camera_ultrasonic_mapper: image=%s range=%s odom=%s map=%s",
+             image_topic_.c_str(),
+             front_range_topic_.c_str(),
+             odom_topic_.c_str(),
+             map_topic_.c_str());
   }
 
  private:
@@ -199,6 +219,7 @@ class SingleCameraUltrasonicMapperNode {
     config.min_range_mm = static_cast<uint16_t>(std::max(0, std::min(65535, min_range)));
     config.max_range_mm = static_cast<uint16_t>(std::max(0, std::min(65535, max_range)));
     private_nh_.param("range_timeout_s", config.range_timeout_s, config.range_timeout_s);
+    private_nh_.param("odom_timeout_s", config.odom_timeout_s, config.odom_timeout_s);
     private_nh_.param("publish_rate_hz", config.publish_rate_hz, config.publish_rate_hz);
     return config;
   }
@@ -208,8 +229,15 @@ class SingleCameraUltrasonicMapperNode {
     last_range_time_ = ros::Time::now();
   }
 
+  void handleOdom(const nav_msgs::Odometry::ConstPtr& msg) {
+    odom_pose_.x = msg->pose.pose.position.x;
+    odom_pose_.y = msg->pose.pose.position.y;
+    odom_pose_.yaw = tf::getYaw(msg->pose.pose.orientation);
+    odom_pose_.stamp = msg->header.stamp.isZero() ? ros::Time::now() : msg->header.stamp;
+  }
+
   void handleImage(const sensor_msgs::Image::ConstPtr& msg) {
-    if (!rangeFresh() || last_range_mm_ < config_.min_range_mm || last_range_mm_ > config_.max_range_mm) {
+    if (!rangeFresh() || !odomFresh() || last_range_mm_ < config_.min_range_mm || last_range_mm_ > config_.max_range_mm) {
       return;
     }
 
@@ -223,7 +251,10 @@ class SingleCameraUltrasonicMapperNode {
 
     const double bearing = bearing_estimator_.estimateBearingRad(cv_ptr->image);
     const double range_m = static_cast<double>(last_range_mm_) / 1000.0;
-    local_map_.integrate(range_m, bearing);
+    const double world_bearing = odom_pose_.yaw + bearing;
+    const double hit_x = odom_pose_.x + range_m * std::cos(world_bearing);
+    const double hit_y = odom_pose_.y + range_m * std::sin(world_bearing);
+    local_map_.integrate(odom_pose_.x, odom_pose_.y, hit_x, hit_y);
     last_map_update_ = ros::Time::now();
   }
 
@@ -238,19 +269,26 @@ class SingleCameraUltrasonicMapperNode {
     return !last_range_time_.isZero() && (ros::Time::now() - last_range_time_).toSec() <= config_.range_timeout_s;
   }
 
+  bool odomFresh() const {
+    return !odom_pose_.stamp.isZero() && (ros::Time::now() - odom_pose_.stamp).toSec() <= config_.odom_timeout_s;
+  }
+
   ros::NodeHandle nh_;
   ros::NodeHandle private_nh_;
   ros::Publisher map_pub_;
   ros::Subscriber image_sub_;
   ros::Subscriber range_sub_;
+  ros::Subscriber odom_sub_;
   ros::Timer timer_;
   MapperConfig config_;
   CameraBearingEstimator bearing_estimator_;
   LocalOccupancyMap local_map_;
   std::string image_topic_;
   std::string front_range_topic_;
+  std::string odom_topic_;
   std::string map_topic_;
   std::string map_frame_;
+  RobotPose2D odom_pose_;
   uint16_t last_range_mm_ = 0;
   ros::Time last_range_time_;
   ros::Time last_map_update_;
