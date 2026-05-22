@@ -47,15 +47,11 @@ install_pnpm() {
 }
 
 # ==================== 本机配置生成 ====================
-# 作用：创建只存在于本机的环境文件，保存运行路径和首次登录密码。
+# 作用：创建只存在于本机的环境文件，保存运行路径和首次默认登录密码。
 # ======================================================
-random_password() {
-  if have_cmd openssl; then
-    openssl rand -base64 18 | tr -d n
-  else
-    date +%s%N | sha256sum | cut -c 1-24
-  fi
-}
+DEFAULT_HOSTPC_USER="user"
+# 说明：这是可提交到 Git 的首次默认密码，只用于第一次生成账号；登录后仍会提示用户改密。
+DEFAULT_HOSTPC_PASSWORD="Lain0706"
 
 write_env_file() {
   ensure_runtime_dirs
@@ -64,24 +60,23 @@ write_env_file() {
     return
   fi
 
-  local password tmp
-  password="$(random_password)"
+  local tmp
   tmp="$(make_temp_file)"
   cat >"${tmp}" <<EOF_ENV
-# 作用：AmseokBot-Milo 本机运行配置。此文件含首次登录密码，不要提交到 Git。
+# 作用：AmseokBot-Milo 本机运行配置。HOSTPC_PASSWORD 为仓库默认首次密码，首次登录后请修改。
 AMSEOKBOT_REPO_DIR=${AMSEOKBOT_REPO_DIR}
 AMSEOKBOT_MASTER_DIR=${AMSEOKBOT_MASTER_DIR}
 AMSEOKBOT_API_ADDR=0.0.0.0:8080
 AMSEOKBOT_CONFIG_DIR=/etc/amseokbot
 AMSEOKBOT_DATA_DIR=/var/lib/amseokbot
 AMSEOKBOT_LOG_DIR=/var/log/amseokbot
-HOSTPC_USER=user
-HOSTPC_PASSWORD=${password}
+HOSTPC_USER=${DEFAULT_HOSTPC_USER}
+HOSTPC_PASSWORD=${DEFAULT_HOSTPC_PASSWORD}
 EOF_ENV
   as_root install -m 0600 "${tmp}" "${AMSEOKBOT_ENV_FILE}"
   rm -f "${tmp}"
   log "已生成环境文件：${AMSEOKBOT_ENV_FILE}"
-  log "首次登录账号为 user；首次密码已写入 ${AMSEOKBOT_ENV_FILE}，登录后请立即修改。"
+  log "首次登录账号为 ${DEFAULT_HOSTPC_USER}；默认密码为 ${DEFAULT_HOSTPC_PASSWORD}，登录后请立即修改。"
 }
 
 # ==================== 安装入口 ====================

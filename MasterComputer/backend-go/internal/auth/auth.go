@@ -57,8 +57,8 @@ func (s *Store) loadOrCreate() error {
 
 	body, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		username := getenvDefault("HOSTPC_USER", "user")
-		password := getenvDefault("HOSTPC_PASSWORD", "change-me-on-first-login")
+		username := getenvDefault("HOSTPC_USER", defaultUsername)
+		password := getenvDefault("HOSTPC_PASSWORD", defaultPassword)
 		salt := randomHex(16)
 		s.user = UserRecord{
 			Username:           username,
