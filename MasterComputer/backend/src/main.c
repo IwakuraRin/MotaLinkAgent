@@ -24,14 +24,11 @@ void amseokbot_print_health_json(void) {
     printf("{\"ok\":true,\"service\":\"amseokbot-control-core\",\"roles\":[\"motor\",\"serial\",\"chassis\",\"safety\"]}\n");
 }
 
-void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, const amseokbot_wheel_speed_t *speed, const amseokbot_serial_frame_t *frame) {
-    printf("{\"ok\":true,\"type\":\"chassis\",\"command\":{\"vx_mps\":%.6f,\"vy_mps\":%.6f,\"wz_radps\":%.6f},\"wheel_radps\":{\"right_front\":%.6f,\"left_front\":%.6f,\"rear\":%.6f},\"serial_frame\":\"%s\"}\n",
+void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, const amseokbot_serial_frame_t *frame) {
+    printf("{\"ok\":true,\"type\":\"chassis\",\"command\":{\"vx_mps\":%.6f,\"vy_mps\":%.6f,\"wz_radps\":%.6f},\"serial_frame\":\"%s\"}\n",
         command->vx_mps,
         command->vy_mps,
         command->wz_radps,
-        speed->right_front_radps,
-        speed->left_front_radps,
-        speed->rear_radps,
         frame->text);
 }
 
@@ -157,10 +154,9 @@ int main(int argc, char **argv) {
             fprintf(stderr, "%s\n", error);
             return 1;
         }
-        amseokbot_wheel_speed_t speed = amseokbot_compute_wheel_speed(&command);
         amseokbot_serial_frame_t frame = {0};
-        amseokbot_build_chassis_frame(&speed, &frame);
-        amseokbot_print_chassis_json(&command, &speed, &frame);
+        amseokbot_build_chassis_frame(&command, &frame);
+        amseokbot_print_chassis_json(&command, &frame);
         return 0;
     }
 

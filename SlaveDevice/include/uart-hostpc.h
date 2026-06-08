@@ -15,7 +15,7 @@
 // ==========================================================
 class UARTHostPC {
 public:
-    static const uint8_t kLineBufferSize = 96;
+    static const uint8_t kLineBufferSize = 96;  // 单行 UART 命令最大缓存长度，含结尾 0。
 
     explicit UARTHostPC(HardwareSerial& port = Serial);
 
@@ -27,11 +27,11 @@ public:
     void clearOverflow();
 
 private:
-    HardwareSerial* port_;
-    char rxBuffer_[kLineBufferSize];
-    uint8_t rxLength_;
-    bool overflowed_;
-    bool droppingLine_;
+    HardwareSerial* port_;             // 实际使用的 Arduino 硬件串口对象。
+    char rxBuffer_[kLineBufferSize];   // 正在接收但尚未遇到换行符的命令缓冲区。
+    uint8_t rxLength_;                 // rxBuffer_ 当前已写入的字符数量。
+    bool overflowed_;                  // 上一条命令是否超过缓冲区并触发溢出。
+    bool droppingLine_;                // 溢出后是否正在丢弃当前行直到换行符。
 };
 
 #endif

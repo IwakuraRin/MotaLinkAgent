@@ -16,7 +16,7 @@
 // ==========================================================
 class SR04Sensor {
 public:
-    static const uint16_t kInvalidDistanceMm = 0;
+    static const uint16_t kInvalidDistanceMm = 0;  // 无效距离返回值，表示 Echo 超时或没有可靠回波。
 
     SR04Sensor();
 
@@ -24,9 +24,9 @@ public:
     uint16_t readDistanceMm() const;
 
 private:
-    uint8_t triggerPin_;
-    uint8_t echoPin_;
-    uint32_t timeoutUs_;
+    uint8_t triggerPin_;  // Trig 输出引脚，用于发出 10us 触发脉冲。
+    uint8_t echoPin_;     // Echo 输入引脚，用于测量回波高电平宽度。
+    uint32_t timeoutUs_;  // pulseIn 等待 Echo 的超时时间，单位 us。
 };
 
 #endif

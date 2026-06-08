@@ -1,19 +1,14 @@
 /*
 |--------------------------------------------------------------------------
-| 三全向轮底盘运动学节点
+| 底盘速度串口节点
 |--------------------------------------------------------------------------
-| 把 /cmd_vel 车体速度转换为三颗 85mm 全向轮目标速度，并通过 ATmega 串口桥下发。
-| 收到下位机超声波急停状态时，本节点同步停止发布运动命令。
+| 把 /cmd_vel 车体速度直接转发给 ATmega，下位机负责逆运动学、限幅和平滑。
 |--------------------------------------------------------------------------
 */
 
 #include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdint>
 #include <sstream>
 #include <string>
-#include <vector>
 
 #include <geometry_msgs/Twist.h>
 #include <ros/ros.h>
@@ -23,111 +18,40 @@
 
 namespace amseokbot_milo {
 
-/*
-|--------------------------------------------------------------------------
-| 底盘几何参数
-|--------------------------------------------------------------------------
-| 保存三颗全向轮相对底盘中心的角度、半径、轮半径和安全速度上限。
-|--------------------------------------------------------------------------
-*/
-struct ChassisConfig {
-  double wheel_base_radius_m = 0.1337147;
-  double wheel_radius_m = 0.0425;
-  double max_wheel_omega_rad_s = 25.10;
+struct ChassisCommandConfig {
+  double max_linear_mps = 0.80;
+  double max_angular_radps = 2.50;
   double command_timeout_s = 0.35;
   double control_rate_hz = 30.0;
-  double twist_filter_tau_s = 0.08;
-  double wheel_command_scale = 100.0;
   bool publish_serial = true;
-  std::string serial_prefix = "MOTOR";
-  std::vector<double> wheel_angles_deg {29.9459, 149.6229, -90.8207};
-  std::vector<double> wheel_signs {1.0, 1.0, 1.0};
+  std::string serial_prefix = "CHASSIS";
 };
 
-/*
-|--------------------------------------------------------------------------
-| 通用数学工具
-|--------------------------------------------------------------------------
-| 放置角度转换、限幅、三维向量缩放等纯工具函数。
-|--------------------------------------------------------------------------
-*/
 double clampValue(double value, double low, double high) {
   return std::max(low, std::min(high, value));
 }
-
-double degToRad(double deg) {
-  return deg * M_PI / 180.0;
-}
-
-std::array<double, 3> scaleToWheelLimit(const std::array<double, 3>& wheel_omega, double max_abs_omega) {
-  double largest = 0.0;
-  for (double value : wheel_omega) {
-    largest = std::max(largest, std::abs(value));
-  }
-  if (largest <= max_abs_omega || largest <= 1e-9) {
-    return wheel_omega;
-  }
-  const double scale = max_abs_omega / largest;
-  return {wheel_omega[0] * scale, wheel_omega[1] * scale, wheel_omega[2] * scale};
-}
-
-int16_t wheelOmegaToCommand(double omega_rad_s, double scale) {
-  const double scaled = clampValue(std::round(omega_rad_s * scale), -32767.0, 32767.0);
-  return static_cast<int16_t>(scaled);
-}
-
-/*
-|--------------------------------------------------------------------------
-| 三全向轮逆运动学模型
-|--------------------------------------------------------------------------
-| 输入车体坐标系 twist [vx, vy, wz]，输出每颗轮子的角速度 rad/s。
-| 车体坐标约定：x 向前、y 向左、z 向上。
-|--------------------------------------------------------------------------
-*/
-class OmniTriangleKinematics {
- public:
-  explicit OmniTriangleKinematics(const ChassisConfig& config) : config_(config) {}
-
-  std::array<double, 3> wheelOmegaFromTwist(const geometry_msgs::Twist& twist) const {
-    std::array<double, 3> out {0.0, 0.0, 0.0};
-    for (std::size_t index = 0; index < 3; ++index) {
-      const double theta = degToRad(config_.wheel_angles_deg[index]);
-      const double sign = config_.wheel_signs[index];
-      const double linear_speed = sign * (
-        -std::sin(theta) * twist.linear.x +
-         std::cos(theta) * twist.linear.y +
-         config_.wheel_base_radius_m * twist.angular.z
-      );
-      out[index] = linear_speed / config_.wheel_radius_m;
-    }
-    return scaleToWheelLimit(out, config_.max_wheel_omega_rad_s);
-  }
-
- private:
-  ChassisConfig config_;
-};
 
 /*
 |--------------------------------------------------------------------------
 | ROS 底盘节点
 |--------------------------------------------------------------------------
-| 订阅速度指令和下位机急停状态，定频输出轮速调试话题和 ATmega MOTOR 命令。
+| 订阅速度指令和下位机急停状态，定频输出底盘整体速度命令。
 |--------------------------------------------------------------------------
 */
 class ChassisKinematicsNode {
  public:
-  ChassisKinematicsNode() : private_nh_("~"), kinematics_(loadConfig()) {
+  ChassisKinematicsNode() : private_nh_("~"), config_(loadConfig()) {
     std::string cmd_vel_topic;
-    std::string wheel_omega_topic;
+    std::string body_twist_topic;
     std::string serial_tx_topic;
     std::string obstacle_stop_topic;
 
     private_nh_.param<std::string>("cmd_vel_topic", cmd_vel_topic, "/cmd_vel");
-    private_nh_.param<std::string>("wheel_omega_topic", wheel_omega_topic, "/chassis/wheel_omega");
+    private_nh_.param<std::string>("body_twist_topic", body_twist_topic, "/chassis/body_twist");
     private_nh_.param<std::string>("serial_tx_topic", serial_tx_topic, "/atmega_serial_bridge/tx");
     private_nh_.param<std::string>("obstacle_stop_topic", obstacle_stop_topic, "/safety/obstacle_stop");
 
-    wheel_pub_ = nh_.advertise<std_msgs::Float32MultiArray>(wheel_omega_topic, 10);
+    body_twist_pub_ = nh_.advertise<std_msgs::Float32MultiArray>(body_twist_topic, 10);
     serial_pub_ = nh_.advertise<std_msgs::String>(serial_tx_topic, 10);
     cmd_sub_ = nh_.subscribe(cmd_vel_topic, 10, &ChassisKinematicsNode::handleTwist, this);
     obstacle_sub_ = nh_.subscribe(obstacle_stop_topic, 10, &ChassisKinematicsNode::handleObstacleStop, this);
@@ -135,35 +59,27 @@ class ChassisKinematicsNode {
     last_cmd_time_ = ros::Time(0);
     timer_ = nh_.createTimer(ros::Duration(1.0 / std::max(1.0, config_.control_rate_hz)), &ChassisKinematicsNode::handleTimer, this);
 
-    ROS_INFO("chassis_kinematics_cpp: cmd=%s serial=%s obstacle=%s prefix=%s", cmd_vel_topic.c_str(), serial_tx_topic.c_str(), obstacle_stop_topic.c_str(), config_.serial_prefix.c_str());
+    ROS_INFO("chassis_command_cpp: cmd=%s serial=%s obstacle=%s prefix=%s",
+             cmd_vel_topic.c_str(),
+             serial_tx_topic.c_str(),
+             obstacle_stop_topic.c_str(),
+             config_.serial_prefix.c_str());
   }
 
  private:
-  ChassisConfig loadConfig() {
-    ChassisConfig config;
-    private_nh_.param("wheel_base_radius_m", config.wheel_base_radius_m, config.wheel_base_radius_m);
-    private_nh_.param("wheel_radius_m", config.wheel_radius_m, config.wheel_radius_m);
-    private_nh_.param("wheel_omega_max_rad_s", config.max_wheel_omega_rad_s, config.max_wheel_omega_rad_s);
+  ChassisCommandConfig loadConfig() {
+    ChassisCommandConfig config;
+    private_nh_.param("max_linear_mps", config.max_linear_mps, config.max_linear_mps);
+    private_nh_.param("max_angular_radps", config.max_angular_radps, config.max_angular_radps);
     private_nh_.param("command_timeout_s", config.command_timeout_s, config.command_timeout_s);
     private_nh_.param("control_rate_hz", config.control_rate_hz, config.control_rate_hz);
-    private_nh_.param("twist_filter_tau_s", config.twist_filter_tau_s, config.twist_filter_tau_s);
-    private_nh_.param("wheel_command_scale", config.wheel_command_scale, config.wheel_command_scale);
     private_nh_.param("publish_serial", config.publish_serial, config.publish_serial);
     private_nh_.param<std::string>("serial_command_prefix", config.serial_prefix, config.serial_prefix);
-    private_nh_.getParam("wheel_angles_deg", config.wheel_angles_deg);
-    private_nh_.getParam("wheel_signs", config.wheel_signs);
-    if (config.wheel_angles_deg.size() != 3) {
-      config.wheel_angles_deg = {29.9459, 149.6229, -90.8207};
-    }
-    if (config.wheel_signs.size() != 3) {
-      config.wheel_signs = {1.0, 1.0, 1.0};
-    }
-    config_ = config;
     return config;
   }
 
   void handleTwist(const geometry_msgs::Twist::ConstPtr& msg) {
-    target_twist_ = *msg;
+    target_twist_ = limitTwist(*msg);
     last_cmd_time_ = ros::Time::now();
   }
 
@@ -172,8 +88,16 @@ class ChassisKinematicsNode {
     if (obstacle_stop_) {
       target_twist_ = geometry_msgs::Twist();
       last_cmd_time_ = ros::Time::now();
-      ROS_WARN_THROTTLE(1.0, "chassis_kinematics_cpp: obstacle stop active, output zero wheel speed");
+      ROS_WARN_THROTTLE(1.0, "chassis_command_cpp: obstacle stop active, output zero chassis speed");
     }
+  }
+
+  geometry_msgs::Twist limitTwist(const geometry_msgs::Twist& twist) const {
+    geometry_msgs::Twist out = twist;
+    out.linear.x = clampValue(out.linear.x, -config_.max_linear_mps, config_.max_linear_mps);
+    out.linear.y = clampValue(out.linear.y, -config_.max_linear_mps, config_.max_linear_mps);
+    out.angular.z = clampValue(out.angular.z, -config_.max_angular_radps, config_.max_angular_radps);
+    return out;
   }
 
   geometry_msgs::Twist activeTwist() const {
@@ -187,42 +111,40 @@ class ChassisKinematicsNode {
     return target_twist_;
   }
 
-  std::string formatSerialCommand(const std::array<double, 3>& wheel_omega) const {
-    const int16_t w0 = wheelOmegaToCommand(wheel_omega[0], config_.wheel_command_scale);
-    const int16_t w1 = wheelOmegaToCommand(wheel_omega[1], config_.wheel_command_scale);
-    const int16_t w2 = wheelOmegaToCommand(wheel_omega[2], config_.wheel_command_scale);
+  std::string formatSerialCommand(const geometry_msgs::Twist& twist) const {
     std::ostringstream out;
-    out << config_.serial_prefix << " " << w0 << " " << w1 << " " << w2;
+    out.setf(std::ios::fixed);
+    out.precision(6);
+    out << config_.serial_prefix << " " << twist.linear.x << " " << twist.linear.y << " " << twist.angular.z;
     return out.str();
   }
 
   void handleTimer(const ros::TimerEvent&) {
-    const auto wheel_omega = kinematics_.wheelOmegaFromTwist(activeTwist());
+    const geometry_msgs::Twist twist = activeTwist();
 
-    std_msgs::Float32MultiArray wheel_msg;
-    wheel_msg.data = {
-      static_cast<float>(wheel_omega[0]),
-      static_cast<float>(wheel_omega[1]),
-      static_cast<float>(wheel_omega[2])
+    std_msgs::Float32MultiArray body_msg;
+    body_msg.data = {
+      static_cast<float>(twist.linear.x),
+      static_cast<float>(twist.linear.y),
+      static_cast<float>(twist.angular.z)
     };
-    wheel_pub_.publish(wheel_msg);
+    body_twist_pub_.publish(body_msg);
 
     if (config_.publish_serial) {
       std_msgs::String serial_msg;
-      serial_msg.data = formatSerialCommand(wheel_omega);
+      serial_msg.data = formatSerialCommand(twist);
       serial_pub_.publish(serial_msg);
     }
   }
 
   ros::NodeHandle nh_;
   ros::NodeHandle private_nh_;
-  ros::Publisher wheel_pub_;
+  ros::Publisher body_twist_pub_;
   ros::Publisher serial_pub_;
   ros::Subscriber cmd_sub_;
   ros::Subscriber obstacle_sub_;
   ros::Timer timer_;
-  ChassisConfig config_;
-  OmniTriangleKinematics kinematics_;
+  ChassisCommandConfig config_;
   geometry_msgs::Twist target_twist_;
   ros::Time last_cmd_time_;
   bool obstacle_stop_ = false;
@@ -230,13 +152,6 @@ class ChassisKinematicsNode {
 
 }  // namespace amseokbot_milo
 
-/*
-|--------------------------------------------------------------------------
-| 程序入口
-|--------------------------------------------------------------------------
-| 初始化 ROS 节点并进入事件循环。
-|--------------------------------------------------------------------------
-*/
 int main(int argc, char** argv) {
   ros::init(argc, argv, "chassis_kinematics");
   amseokbot_milo::ChassisKinematicsNode node;

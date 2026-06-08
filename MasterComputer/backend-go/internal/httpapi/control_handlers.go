@@ -26,7 +26,7 @@ func (s *Server) handleControlHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // ==================== 底盘控制接口 ====================
-// 作用：接收 vx、vy、wz，调用 C 层计算三全向轮轮速和串口协议帧。
+// 作用：接收 vx、vy、wz，调用 C 层生成下位机底盘速度协议帧。
 // ====================================================
 func (s *Server) handleControlChassisMove(w http.ResponseWriter, r *http.Request) {
 	if !method(w, r, http.MethodPost) {

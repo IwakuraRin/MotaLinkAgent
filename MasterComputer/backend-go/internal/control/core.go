@@ -124,7 +124,7 @@ func (c Client) Health(ctx context.Context) (Result, error) {
 }
 
 // ==================== 底盘运动命令 ====================
-// 作用：把 vx/vy/wz 交给 C 层计算三全向轮轮速和串口协议帧。
+// 作用：把 vx/vy/wz 交给 C 层生成下位机底盘速度协议帧。
 // ====================================================
 func (c Client) MoveChassis(ctx context.Context, command ChassisCommand) (Result, error) {
 	return c.run(ctx, "chassis", "--vx", formatFloat(command.VXMps), "--vy", formatFloat(command.VYMps), "--wz", formatFloat(command.WZRadps))

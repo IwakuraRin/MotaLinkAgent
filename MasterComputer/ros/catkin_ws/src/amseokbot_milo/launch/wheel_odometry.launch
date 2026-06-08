@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
   霍尔轮速里程计启动文件：
-  使用 32F103 驱动板回传的三轮霍尔速度反馈，发布 /odom 和 odom->base_link。
+  使用 IIC 驱动板回传的三轮霍尔速度反馈，发布 /odom 和 odom->base_link。
 -->
 <launch>
   <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>

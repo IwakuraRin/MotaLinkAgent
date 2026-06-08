@@ -2,7 +2,7 @@
 |--------------------------------------------------------------------------
 | IIC 霍尔电机驱动板通信实现
 |--------------------------------------------------------------------------
-| 使用命令字 + 小端 payload 的紧凑协议，把三轮速度和急停命令发给 32F103。
+| 使用命令字 + 小端 payload 的紧凑协议，把三轮速度和急停命令发给 IIC 驱动板。
 |--------------------------------------------------------------------------
 */
 #include "iic-hall-motor-driver.h"
@@ -21,15 +21,15 @@ void IICHallMotorDriver::init(uint8_t address, uint32_t clockHz) {
 }
 
 // ==================== 控制命令 ====================
-// 作用：发送使能、三轮速度和急停命令，速度单位由 32F103 驱动板固件约定。
+// 作用：发送使能、三轮速度和急停命令，速度单位由 IIC 驱动板固件约定。
 // ==================================================
 bool IICHallMotorDriver::setEnabled(bool enabled) {
-    const uint8_t payload[1] = { static_cast<uint8_t>(enabled ? 1 : 0) };
+    const uint8_t payload[1] = { static_cast<uint8_t>(enabled ? 1 : 0) };  // 使能命令 payload：1 为使能，0 为关闭。
     return writeCommand(kCmdSetEnabled, payload, sizeof(payload));
 }
 
 bool IICHallMotorDriver::setWheelSpeed(int16_t wheel0, int16_t wheel1, int16_t wheel2) {
-    uint8_t payload[6];
+    uint8_t payload[6];  // 三个 int16 轮速命令的小端字节序 payload。
     writeInt16LE(payload, 0, wheel0);
     writeInt16LE(payload, 2, wheel1);
     writeInt16LE(payload, 4, wheel2);
@@ -48,7 +48,7 @@ bool IICHallMotorDriver::readStatus(HallMotorStatus& status) {
         return false;
     }
 
-    const uint8_t received = Wire.requestFrom(address_, kStatusPayloadSize);
+    const uint8_t received = Wire.requestFrom(address_, kStatusPayloadSize);  // 本次从驱动板实际读到的状态字节数。
     if (received != kStatusPayloadSize) {
         lastError_ = 0xFE;
         while (Wire.available() > 0) {
@@ -57,7 +57,7 @@ bool IICHallMotorDriver::readStatus(HallMotorStatus& status) {
         return false;
     }
 
-    uint8_t payload[kStatusPayloadSize];
+    uint8_t payload[kStatusPayloadSize];  // 驱动板状态原始 payload 缓冲区。
     for (uint8_t i = 0; i < kStatusPayloadSize; ++i) {
         payload[i] = static_cast<uint8_t>(Wire.read());
     }
@@ -89,12 +89,12 @@ bool IICHallMotorDriver::writeCommand(uint8_t command, const uint8_t* payload, u
 }
 
 void IICHallMotorDriver::writeInt16LE(uint8_t* buffer, uint8_t index, int16_t value) {
-    const uint16_t raw = static_cast<uint16_t>(value);
+    const uint16_t raw = static_cast<uint16_t>(value);  // 保留 int16 二进制补码表示，用于拆成小端字节。
     buffer[index] = static_cast<uint8_t>(raw & 0xFF);
     buffer[index + 1] = static_cast<uint8_t>((raw >> 8) & 0xFF);
 }
 
 int16_t IICHallMotorDriver::readInt16LE(uint8_t lowByte, uint8_t highByte) {
-    const uint16_t raw = static_cast<uint16_t>(lowByte) | (static_cast<uint16_t>(highByte) << 8);
+    const uint16_t raw = static_cast<uint16_t>(lowByte) | (static_cast<uint16_t>(highByte) << 8);  // 小端两字节合成原始 16 位值。
     return static_cast<int16_t>(raw);
 }

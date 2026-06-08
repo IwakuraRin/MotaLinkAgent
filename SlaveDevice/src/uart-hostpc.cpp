@@ -32,7 +32,7 @@ bool UARTHostPC::readLine(char* output, uint8_t outputSize) {
     }
 
     while (port_->available() > 0) {
-        const char ch = static_cast<char>(port_->read());
+        const char ch = static_cast<char>(port_->read());  // 串口当前读到的单个字符。
 
         if (ch == 13) {
             continue;

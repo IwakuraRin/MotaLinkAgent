@@ -7,6 +7,8 @@
 */
 #include "obstacle-safety.h"
 
+#include <stdio.h>
+
 // ==================== 初始化 ====================
 // 作用：设置默认急停阈值，hard=160mm，stop=260mm，clear=360mm。
 // =================================================
@@ -43,7 +45,7 @@ void ObstacleSafety::configure(
 // 作用：输入一次原始测距，输出过滤后的距离和急停状态变化。
 // ==================================================
 ObstacleSafetyResult ObstacleSafety::update(uint16_t rawDistanceMm) {
-    ObstacleSafetyResult result {rawDistanceMm, medianDistanceMm_, filteredDistanceMm_, rawDistanceMm > 0, blocked_, kObstacleSafetyNone};
+    ObstacleSafetyResult result {rawDistanceMm, medianDistanceMm_, filteredDistanceMm_, rawDistanceMm > 0, blocked_, kObstacleSafetyNone};  // 默认返回当前状态，无效读数不改变滤波器。
     if (!result.valid) {
         return result;
     }
@@ -56,9 +58,9 @@ ObstacleSafetyResult ObstacleSafety::update(uint16_t rawDistanceMm) {
         filteredDistanceMm_ = static_cast<uint16_t>((static_cast<uint32_t>(filteredDistanceMm_) * 3U + medianDistanceMm_ + 2U) / 4U);
     }
 
-    const bool hardNear = rawDistanceMm <= hardStopDistanceMm_;
-    const bool stableNear = medianDistanceMm_ <= stopDistanceMm_ || filteredDistanceMm_ <= stopDistanceMm_;
-    const bool stableClear = medianDistanceMm_ >= clearDistanceMm_ && filteredDistanceMm_ >= clearDistanceMm_;
+    const bool hardNear = rawDistanceMm <= hardStopDistanceMm_;  // 原始距离已经极近，需要立即急停。
+    const bool stableNear = medianDistanceMm_ <= stopDistanceMm_ || filteredDistanceMm_ <= stopDistanceMm_;  // 滤波距离稳定处于停止阈值内。
+    const bool stableClear = medianDistanceMm_ >= clearDistanceMm_ && filteredDistanceMm_ >= clearDistanceMm_;  // 滤波距离稳定超过解除阈值。
 
     if (!blocked_) {
         if (hardNear) {
@@ -119,12 +121,12 @@ uint16_t ObstacleSafety::pushSampleAndMedian(uint16_t rawDistanceMm) {
 
 uint16_t ObstacleSafety::median3(uint16_t a, uint16_t b, uint16_t c) {
     if (a > b) {
-        const uint16_t tmp = a;
+        const uint16_t tmp = a;  // 交换 a/b 时的临时变量。
         a = b;
         b = tmp;
     }
     if (b > c) {
-        const uint16_t tmp = b;
+        const uint16_t tmp = b;  // 交换 b/c 时的临时变量。
         b = c;
         c = tmp;
     }
@@ -159,4 +161,48 @@ uint16_t ObstacleSafety::clearDistanceMm() const {
 
 uint16_t ObstacleSafety::hardStopDistanceMm() const {
     return hardStopDistanceMm_;
+}
+
+// ==================== 文本状态格式化 ====================
+// 作用：把安全状态转换为上位机协议文本，主程序只负责发送。
+// ========================================================
+void ObstacleSafety::formatTelemetry(char* buffer, uint8_t bufferSize, uint16_t rawDistanceMm) const {
+    if (buffer == nullptr || bufferSize == 0) {
+        return;
+    }
+    snprintf(
+        buffer,
+        bufferSize,
+        "TEL SR04 mm=%u raw=%u median=%u blocked=%u hard=%u stop=%u clear=%u",
+        filteredDistanceMm_,
+        rawDistanceMm,
+        medianDistanceMm_,
+        blocked_ ? 1 : 0,
+        hardStopDistanceMm_,
+        stopDistanceMm_,
+        clearDistanceMm_);
+}
+
+void ObstacleSafety::formatEvent(char* buffer, uint8_t bufferSize, ObstacleSafetyEvent event) const {
+    if (buffer == nullptr || bufferSize == 0) {
+        return;
+    }
+    const char* state = event == kObstacleSafetyStop ? "STOP" : "CLEAR";  // 上报给上位机的障碍物事件状态文本。
+    snprintf(buffer, bufferSize, "EVT OBSTACLE %s mm=%u", state, filteredDistanceMm_);
+}
+
+void ObstacleSafety::formatStatus(char* buffer, uint8_t bufferSize) const {
+    if (buffer == nullptr || bufferSize == 0) {
+        return;
+    }
+    snprintf(
+        buffer,
+        bufferSize,
+        "OK SAFETY hard=%u stop=%u clear=%u blocked=%u mm=%u median=%u",
+        hardStopDistanceMm_,
+        stopDistanceMm_,
+        clearDistanceMm_,
+        blocked_ ? 1 : 0,
+        filteredDistanceMm_,
+        medianDistanceMm_);
 }

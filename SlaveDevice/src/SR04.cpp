@@ -33,12 +33,12 @@ uint16_t SR04Sensor::readDistanceMm() const {
     delayMicroseconds(10);
     digitalWrite(triggerPin_, LOW);
 
-    const uint32_t durationUs = pulseIn(echoPin_, HIGH, timeoutUs_);
+    const uint32_t durationUs = pulseIn(echoPin_, HIGH, timeoutUs_);  // Echo 高电平持续时间，单位 us，0 表示超时。
     if (durationUs == 0) {
         return kInvalidDistanceMm;
     }
 
-    const uint32_t distanceMm = (durationUs * 343UL) / 2000UL;
+    const uint32_t distanceMm = (durationUs * 343UL) / 2000UL;  // 按声速 343m/s 换算出的单程距离，单位 mm。
     if (distanceMm > UINT16_MAX) {
         return UINT16_MAX;
     }
