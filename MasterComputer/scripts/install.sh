@@ -57,7 +57,7 @@ PY_CHECK
   have_cmd python3 || die "缺少 python3，无法安装 YOLO ONNX Runtime"
   have_cmd pip3 || die "缺少 pip3，无法安装 YOLO ONNX Runtime"
   log "安装 YOLO ONNX Runtime：onnxruntime"
-  python3 -m pip install --user onnxruntime==1.16.3
+  python3 -m pip install --user --break-system-packages onnxruntime 2>/dev/null || python3 -m pip install --user onnxruntime
 }
 
 # ==================== 本机配置生成 ====================

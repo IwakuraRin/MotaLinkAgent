@@ -42,19 +42,6 @@ typedef struct {
 
 /*
 |--------------------------------------------------------------------------
-| 底盘轮速输出
-|--------------------------------------------------------------------------
-| 保存右前轮、左前轮和后轮目标角速度。
-|--------------------------------------------------------------------------
-*/
-typedef struct {
-    double right_front_radps;
-    double left_front_radps;
-    double rear_radps;
-} amseokbot_wheel_speed_t;
-
-/*
-|--------------------------------------------------------------------------
 | 串口协议帧
 |--------------------------------------------------------------------------
 | 保存要发送给下位机的文本协议帧，Go 层后续可以把它写入串口。
@@ -65,11 +52,10 @@ typedef struct {
 } amseokbot_serial_frame_t;
 
 bool amseokbot_check_chassis_command(amseokbot_chassis_command_t *command, char *error, size_t error_size);
-amseokbot_wheel_speed_t amseokbot_compute_wheel_speed(const amseokbot_chassis_command_t *command);
-void amseokbot_build_chassis_frame(const amseokbot_wheel_speed_t *speed, amseokbot_serial_frame_t *frame);
+void amseokbot_build_chassis_frame(const amseokbot_chassis_command_t *command, amseokbot_serial_frame_t *frame);
 void amseokbot_build_stop_frame(amseokbot_serial_frame_t *frame);
 void amseokbot_print_health_json(void);
-void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, const amseokbot_wheel_speed_t *speed, const amseokbot_serial_frame_t *frame);
+void amseokbot_print_chassis_json(const amseokbot_chassis_command_t *command, const amseokbot_serial_frame_t *frame);
 void amseokbot_print_stop_json(const amseokbot_serial_frame_t *frame);
 
 

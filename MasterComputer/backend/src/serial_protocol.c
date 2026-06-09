@@ -14,11 +14,11 @@
 |--------------------------------------------------------------------------
 | 底盘协议帧
 |--------------------------------------------------------------------------
-| 输出三轮角速度，后续由 Go 层或 C 串口驱动写入 ATmega/ESP32。
+| 输出底盘整体速度，下位机负责逆运动学、限幅和平滑。
 |--------------------------------------------------------------------------
 */
-void amseokbot_build_chassis_frame(const amseokbot_wheel_speed_t *speed, amseokbot_serial_frame_t *frame) {
-    snprintf(frame->text, sizeof(frame->text), "CHASSIS_WHEEL_OMEGA %.6f %.6f %.6f", speed->right_front_radps, speed->left_front_radps, speed->rear_radps);
+void amseokbot_build_chassis_frame(const amseokbot_chassis_command_t *command, amseokbot_serial_frame_t *frame) {
+    snprintf(frame->text, sizeof(frame->text), "CHASSIS %.6f %.6f %.6f", command->vx_mps, command->vy_mps, command->wz_radps);
 }
 
 /*
@@ -29,5 +29,5 @@ void amseokbot_build_chassis_frame(const amseokbot_wheel_speed_t *speed, amseokb
 |--------------------------------------------------------------------------
 */
 void amseokbot_build_stop_frame(amseokbot_serial_frame_t *frame) {
-    snprintf(frame->text, sizeof(frame->text), "STOP_ALL");
+    snprintf(frame->text, sizeof(frame->text), "STOP");
 }

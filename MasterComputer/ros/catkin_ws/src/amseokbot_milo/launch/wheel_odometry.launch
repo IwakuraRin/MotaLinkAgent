@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
   霍尔轮速里程计启动文件：
-  使用 32F103 驱动板回传的三轮霍尔速度反馈，发布 /odom 和 odom->base_link。
+  使用 IIC 驱动板回传的三轮霍尔速度反馈，发布 /odom 和 odom->base_link。
 -->
 <launch>
   <arg name="wheel_feedback_topic" default="/chassis/wheel_feedback"/>
@@ -26,7 +26,7 @@
     <param name="feedback_timeout_s" value="$(arg feedback_timeout_s)"/>
     <param name="publish_rate_hz" value="$(arg publish_rate_hz)"/>
 
-    <rosparam param="wheel_angles_deg">[29.9459, 149.6229, -90.8207]</rosparam>
+    <rosparam param="wheel_angles_deg">[0.0, 120.0, -121.0]</rosparam>
     <rosparam param="wheel_signs">[1.0, 1.0, 1.0]</rosparam>
   </node>
 </launch>

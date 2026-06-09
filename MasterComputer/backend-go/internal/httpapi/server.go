@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/creack/pty"
@@ -355,15 +356,118 @@ func (s *Server) handleMainWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 	_ = conn.WriteJSON(map[string]any{"type": "log", "line": "INFO  Go HostPC WebSocket connected", "edge": "e_ws"})
+	keysHeld := map[string]bool{}
+	defer func() {
+		_ = s.writeAtmegaLine("CHASSIS 0.000000 0.000000 0.000000")
+	}()
 	for {
 		var msg map[string]any
 		if err := conn.ReadJSON(&msg); err != nil {
 			return
 		}
 		if msg["type"] == "key" {
-			_ = conn.WriteJSON(map[string]any{"type": "ack", "msg": "key command received by Go API", "edge": "e_ws"})
+			key, _ := msg["key"].(string)
+			down, _ := msg["down"].(bool)
+			if key != "w" && key != "a" && key != "s" && key != "d" && key != "q" && key != "e" {
+				_ = conn.WriteJSON(map[string]any{"type": "ack", "msg": "ignored key", "edge": "e_ws"})
+				continue
+			}
+			if down {
+				keysHeld[key] = true
+			} else {
+				delete(keysHeld, key)
+			}
+			frame := chassisFrameFromKeys(keysHeld)
+			if err := s.writeAtmegaLine(frame); err != nil {
+				_ = conn.WriteJSON(map[string]any{"type": "log", "line": "ERR  ATmega UART write failed: " + err.Error(), "edge": "e_ws"})
+				continue
+			}
+			_ = conn.WriteJSON(map[string]any{"type": "ack", "msg": frame, "edge": "e_ws"})
 		}
 	}
+}
+
+func chassisFrameFromKeys(keysHeld map[string]bool) string {
+	const linearMps = 0.25
+	const angularRadps = 0.90
+
+	vx := 0.0
+	vy := 0.0
+	wz := 0.0
+	if keysHeld["w"] {
+		vx += linearMps
+	}
+	if keysHeld["s"] {
+		vx -= linearMps
+	}
+	if keysHeld["a"] {
+		vy += linearMps
+	}
+	if keysHeld["d"] {
+		vy -= linearMps
+	}
+	if keysHeld["q"] {
+		wz += angularRadps
+	}
+	if keysHeld["e"] {
+		wz -= angularRadps
+	}
+	return fmt.Sprintf("CHASSIS %.6f %.6f %.6f", vx, vy, wz)
+}
+
+func (s *Server) writeAtmegaLine(line string) error {
+	port, err := s.atmegaUARTPort()
+	if err != nil {
+		return err
+	}
+	if err := configureSerialPort(port); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(port, os.O_WRONLY|syscall.O_NOCTTY, 0)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if !strings.HasSuffix(line, "\n") {
+		line += "\n"
+	}
+	written, err := file.WriteString(line)
+	if err != nil {
+		return err
+	}
+	if written != len(line) {
+		return fmt.Errorf("short write %d/%d", written, len(line))
+	}
+	return nil
+}
+
+func (s *Server) atmegaUARTPort() (string, error) {
+	body, err := os.ReadFile(s.cfg.Settings)
+	if err != nil {
+		return "", fmt.Errorf("read settings: %w", err)
+	}
+	var settings struct {
+		SerialRoles map[string]string `json:"serial_roles"`
+	}
+	if err := json.Unmarshal(body, &settings); err != nil {
+		return "", fmt.Errorf("parse settings: %w", err)
+	}
+	port := strings.TrimSpace(settings.SerialRoles["atmega_uart"])
+	if port == "" {
+		port = strings.TrimSpace(settings.SerialRoles["esp32_uart"])
+	}
+	if port == "" {
+		return "", fmt.Errorf("serial_roles.atmega_uart is empty")
+	}
+	return port, nil
+}
+
+func configureSerialPort(port string) error {
+	cmd := exec.Command("stty", "-F", port, "115200", "raw", "-echo", "-icanon", "min", "0", "time", "1")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("stty %s: %s", port, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 func (s *Server) handleShellWebSocket(w http.ResponseWriter, r *http.Request) {

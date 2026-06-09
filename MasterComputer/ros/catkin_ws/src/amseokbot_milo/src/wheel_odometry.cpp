@@ -34,7 +34,7 @@ struct WheelOdometryConfig {
   double publish_rate_hz = 30.0;
   std::string odom_frame = "odom";
   std::string base_frame = "base_link";
-  std::vector<double> wheel_angles_deg {29.9459, 149.6229, -90.8207};
+  std::vector<double> wheel_angles_deg {0.0, 120.0, -121.0};
   std::vector<double> wheel_signs {1.0, 1.0, 1.0};
 };
 
@@ -171,7 +171,7 @@ class WheelOdometryNode {
     private_nh_.getParam("wheel_angles_deg", config.wheel_angles_deg);
     private_nh_.getParam("wheel_signs", config.wheel_signs);
     if (config.wheel_angles_deg.size() != 3) {
-      config.wheel_angles_deg = {29.9459, 149.6229, -90.8207};
+      config.wheel_angles_deg = {0.0, 120.0, -121.0};
     }
     if (config.wheel_signs.size() != 3) {
       config.wheel_signs = {1.0, 1.0, 1.0};

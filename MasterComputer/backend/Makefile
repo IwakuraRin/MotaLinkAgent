@@ -10,7 +10,6 @@ COMPAT_TARGET := hostpc-c
 SRC := \
 	src/main.c \
 	src/safety_guard.c \
-	src/chassis_control.c \
 	src/motor_control.c \
 	src/serial_protocol.c \
 	src/file_management.c

@@ -182,6 +182,7 @@ bool parseKeyInt(const std::string& line, const std::string& key, int32_t& value
 bool lineMeansObstacleStop(const std::string& line) {
   return line.find("EVT OBSTACLE STOP") != std::string::npos ||
          line.find("ERR MOTOR obstacle") != std::string::npos ||
+         line.find("ERR CHASSIS obstacle") != std::string::npos ||
          line.find("blocked=1") != std::string::npos;
 }
 

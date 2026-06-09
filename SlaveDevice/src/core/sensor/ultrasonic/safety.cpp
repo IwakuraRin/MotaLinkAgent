@@ -1,15 +1,8 @@
-/*
-|--------------------------------------------------------------------------
-| 超声波障碍物安全状态机实现
-|--------------------------------------------------------------------------
-| 中值滤波抗单点跳变，整数低通平滑距离，迟滞阈值防抖，极近距离立即急停。
-|--------------------------------------------------------------------------
-*/
-#include "obstacle-safety.h"
+/** @file safety.cpp
+ *  @brief 超声波障碍物安全状态机实现。
+ */
+#include "core/sensor/ultrasonic/safety.h"
 
-// ==================== 初始化 ====================
-// 作用：设置默认急停阈值，hard=160mm，stop=260mm，clear=360mm。
-// =================================================
 ObstacleSafety::ObstacleSafety()
     : stopDistanceMm_(260),
       clearDistanceMm_(360),
@@ -39,11 +32,8 @@ void ObstacleSafety::configure(
     clearSamples_ = clearSamples == 0 ? 1 : clearSamples;
 }
 
-// ==================== 状态更新 ====================
-// 作用：输入一次原始测距，输出过滤后的距离和急停状态变化。
-// ==================================================
 ObstacleSafetyResult ObstacleSafety::update(uint16_t rawDistanceMm) {
-    ObstacleSafetyResult result {rawDistanceMm, medianDistanceMm_, filteredDistanceMm_, rawDistanceMm > 0, blocked_, kObstacleSafetyNone};
+    ObstacleSafetyResult result {rawDistanceMm, medianDistanceMm_, filteredDistanceMm_, rawDistanceMm > 0, blocked_, kObstacleSafetyNone}; ///< 默认返回当前状态，无效读数不改变滤波器。
     if (!result.valid) {
         return result;
     }
@@ -56,9 +46,9 @@ ObstacleSafetyResult ObstacleSafety::update(uint16_t rawDistanceMm) {
         filteredDistanceMm_ = static_cast<uint16_t>((static_cast<uint32_t>(filteredDistanceMm_) * 3U + medianDistanceMm_ + 2U) / 4U);
     }
 
-    const bool hardNear = rawDistanceMm <= hardStopDistanceMm_;
-    const bool stableNear = medianDistanceMm_ <= stopDistanceMm_ || filteredDistanceMm_ <= stopDistanceMm_;
-    const bool stableClear = medianDistanceMm_ >= clearDistanceMm_ && filteredDistanceMm_ >= clearDistanceMm_;
+    const bool hardNear = rawDistanceMm <= hardStopDistanceMm_; ///< 原始距离已经极近，需要立即急停。
+    const bool stableNear = medianDistanceMm_ <= stopDistanceMm_ || filteredDistanceMm_ <= stopDistanceMm_; ///< 滤波距离稳定处于停止阈值内。
+    const bool stableClear = medianDistanceMm_ >= clearDistanceMm_ && filteredDistanceMm_ >= clearDistanceMm_; ///< 滤波距离稳定超过解除阈值。
 
     if (!blocked_) {
         if (hardNear) {
@@ -98,9 +88,6 @@ ObstacleSafetyResult ObstacleSafety::update(uint16_t rawDistanceMm) {
     return result;
 }
 
-// ==================== 中值滤波 ====================
-// 作用：保存最近 3 个有效距离，取中值抑制单次异常跳变。
-// ==================================================
 uint16_t ObstacleSafety::pushSampleAndMedian(uint16_t rawDistanceMm) {
     samples_[sampleIndex_] = rawDistanceMm;
     sampleIndex_ = static_cast<uint8_t>((sampleIndex_ + 1U) % kMedianSampleCount);
@@ -119,12 +106,12 @@ uint16_t ObstacleSafety::pushSampleAndMedian(uint16_t rawDistanceMm) {
 
 uint16_t ObstacleSafety::median3(uint16_t a, uint16_t b, uint16_t c) {
     if (a > b) {
-        const uint16_t tmp = a;
+        const uint16_t tmp = a; ///< 交换 a/b 时的临时变量。
         a = b;
         b = tmp;
     }
     if (b > c) {
-        const uint16_t tmp = b;
+        const uint16_t tmp = b; ///< 交换 b/c 时的临时变量。
         b = c;
         c = tmp;
     }
@@ -134,9 +121,6 @@ uint16_t ObstacleSafety::median3(uint16_t a, uint16_t b, uint16_t c) {
     return b;
 }
 
-// ==================== 状态查询 ====================
-// 作用：提供主循环和命令处理所需的只读安全状态。
-// ==================================================
 bool ObstacleSafety::blocked() const {
     return blocked_;
 }
