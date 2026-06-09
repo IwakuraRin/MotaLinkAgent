@@ -1,23 +1,16 @@
-/*
-|--------------------------------------------------------------------------
-| 三全向轮底盘运动学实现
-|--------------------------------------------------------------------------
-| 使用与上位机里程计一致的三轮安装角，把底盘整体速度和三轮速度互相转换。
-|--------------------------------------------------------------------------
-*/
-#include "chassis-kinematics.h"
+/** @file kinematics.cpp
+ *  @brief 三全向轮底盘正逆运动学实现。
+ */
+#include "core/chassis/kinematics.h"
 
 #include <math.h>
 
 namespace {
-const int16_t kWheelAngleDeg[OmniTriangleKinematics::kWheelCount] = {0, 120, -121};                   // 三轮滚动切向角，单位 degree，来自底盘几何标定。
-const float kWheelSign[OmniTriangleKinematics::kWheelCount] = {1.0f, 1.0f, 1.0f};                      // 单轮安装方向修正，电机正方向反了就改对应符号。
-const float kPi = 3.1415927f;                                                                         // 角度和弧度换算使用的 float 精度圆周率。
+const int16_t kWheelAngleDeg[OmniTriangleKinematics::kWheelCount] = {0, 120, -121}; ///< 三轮滚动切向角，单位 degree，来自底盘几何标定。
+const float kWheelSign[OmniTriangleKinematics::kWheelCount] = {1.0f, 1.0f, 1.0f};    ///< 单轮安装方向修正，电机正方向反了就改对应符号。
+const float kPi = 3.1415927f;                                                       ///< 角度和弧度换算使用的 float 精度圆周率。
 }
 
-// ==================== 初始化 ====================
-// 作用：设置默认几何参数和驱动板轮速命令比例。
-// =================================================
 OmniTriangleKinematics::OmniTriangleKinematics()
     : wheelBaseRadiusM_(0.1337147f),
       wheelRadiusM_(0.0425f),
@@ -31,42 +24,36 @@ void OmniTriangleKinematics::configure(float wheelBaseRadiusM, float wheelRadius
     wheelCommandScale_ = wheelCommandScale;
 }
 
-// ==================== 逆运动学 ====================
-// 作用：把底盘 vx/vy/wz 转成三轮角速度，并缩放成驱动板 int16 命令。
-// ==================================================
 void OmniTriangleKinematics::wheelCommandFromTwist(const ChassisTwist& twist, ChassisWheelCommand& output) const {
-    float omega[kWheelCount] = {0.0f, 0.0f, 0.0f};  // 逆运动学得到的三轮角速度，单位 rad/s。
+    float omega[kWheelCount] = {0.0f, 0.0f, 0.0f}; ///< 逆运动学得到的三轮角速度，单位 rad/s。
     wheelOmegaFromTwist(twist, omega);
     for (uint8_t i = 0; i < kWheelCount; ++i) {
         output.omegaRadps[i] = omega[i];
-        const float scaled = clampFloat(roundf(omega[i] * wheelCommandScale_), -32767.0f, 32767.0f);  // IIC 驱动板协议使用 int16，保留 -32768 作为异常空间。
+        const float scaled = clampFloat(roundf(omega[i] * wheelCommandScale_), -32767.0f, 32767.0f); ///< IIC 驱动板协议使用 int16，保留 -32768 作为异常空间。
         output.command[i] = static_cast<int16_t>(scaled);
     }
 }
 
 void OmniTriangleKinematics::wheelOmegaFromTwist(const ChassisTwist& twist, float omega[kWheelCount]) const {
-    float largest = 0.0f;  // 当前三轮角速度绝对值最大值，用于保持运动方向的等比例限幅。
+    float largest = 0.0f; ///< 当前三轮角速度绝对值最大值，用于保持运动方向的等比例限幅。
     for (uint8_t i = 0; i < kWheelCount; ++i) {
-        const float theta = static_cast<float>(kWheelAngleDeg[i]) * kPi / 180.0f;  // 当前轮滚动切向角，单位 rad。
+        const float theta = static_cast<float>(kWheelAngleDeg[i]) * kPi / 180.0f; ///< 当前轮滚动切向角，单位 rad。
         const float linearSpeed = kWheelSign[i] * (
             -sinf(theta) * twist.vxMps +
             cosf(theta) * twist.vyMps +
-            wheelBaseRadiusM_ * twist.wzRadps);  // 当前轮接地点沿滚动方向的线速度，单位 m/s。
+            wheelBaseRadiusM_ * twist.wzRadps); ///< 当前轮接地点沿滚动方向的线速度，单位 m/s。
         omega[i] = linearSpeed / wheelRadiusM_;
         largest = max(largest, fabs(omega[i]));
     }
 
     if (largest > maxWheelOmegaRadps_ && largest > 1.0e-6f) {
-        const float scale = maxWheelOmegaRadps_ / largest;  // 三轮共同缩放比例，避免单轮超过速度上限。
+        const float scale = maxWheelOmegaRadps_ / largest; ///< 三轮共同缩放比例，避免单轮超过速度上限。
         for (uint8_t i = 0; i < kWheelCount; ++i) {
             omega[i] *= scale;
         }
     }
 }
 
-// ==================== 正运动学 ====================
-// 作用：把三轮反馈命令值还原成底盘速度，供状态估计或调试复用。
-// ==================================================
 void OmniTriangleKinematics::twistFromWheelCommand(const int16_t wheelCommand[kWheelCount], ChassisTwist& twist) const {
     const float w0 = (wheelCommand[0] / wheelCommandScale_) * wheelRadiusM_ / kWheelSign[0];  // 0 号轮滚动方向线速度，单位 m/s。
     const float w1 = (wheelCommand[1] / wheelCommandScale_) * wheelRadiusM_ / kWheelSign[1];  // 1 号轮滚动方向线速度，单位 m/s。
@@ -95,9 +82,6 @@ void OmniTriangleKinematics::twistFromWheelCommand(const int16_t wheelCommand[kW
     twist.vyMps = (a0 * l1 - a1 * l0) / det;
 }
 
-// ==================== 数学工具 ====================
-// 作用：提供轻量限幅函数，避免在 ATmega 上引入额外依赖。
-// ==================================================
 float OmniTriangleKinematics::clampFloat(float value, float low, float high) {
     if (value < low) {
         return low;
