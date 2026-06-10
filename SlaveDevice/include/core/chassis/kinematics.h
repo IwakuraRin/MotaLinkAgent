@@ -1,5 +1,5 @@
-/** @file kinematics.h
- *  @brief 三全向轮底盘运动学转换。
+/** @file include/core/chassis/kinematics.h
+ *  @brief 底盘运动学接口定义。
  */
 #ifndef CORE_CHASSIS_KINEMATICS_H
 #define CORE_CHASSIS_KINEMATICS_H

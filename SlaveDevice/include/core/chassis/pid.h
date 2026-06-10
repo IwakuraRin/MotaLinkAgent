@@ -1,5 +1,5 @@
-/** @file pid.h
- *  @brief 三轮霍尔反馈速度 PID 修正器。
+/** @file include/core/chassis/pid.h
+ *  @brief 轮速 PID 接口定义。
  */
 #ifndef CORE_CHASSIS_PID_H
 #define CORE_CHASSIS_PID_H

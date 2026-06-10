@@ -1,5 +1,5 @@
-/** @file kinematics.cpp
- *  @brief 三全向轮底盘正逆运动学实现。
+/** @file src/core/chassis/kinematics.cpp
+ *  @brief 底盘运动学接口实现。
  */
 #include "core/chassis/kinematics.h"
 
@@ -7,7 +7,6 @@
 
 namespace {
 const int16_t kWheelAngleDeg[OmniTriangleKinematics::kWheelCount] = {0, 120, -121}; ///< 三轮滚动切向角，单位 degree，来自底盘几何标定。
-const float kWheelSign[OmniTriangleKinematics::kWheelCount] = {1.0f, 1.0f, 1.0f};    ///< 单轮安装方向修正，电机正方向反了就改对应符号。
 const float kPi = 3.1415927f;                                                       ///< 角度和弧度换算使用的 float 精度圆周率。
 }
 
@@ -38,7 +37,7 @@ void OmniTriangleKinematics::wheelOmegaFromTwist(const ChassisTwist& twist, floa
     float largest = 0.0f; ///< 当前三轮角速度绝对值最大值，用于保持运动方向的等比例限幅。
     for (uint8_t i = 0; i < kWheelCount; ++i) {
         const float theta = static_cast<float>(kWheelAngleDeg[i]) * kPi / 180.0f; ///< 当前轮滚动切向角，单位 rad。
-        const float linearSpeed = kWheelSign[i] * (
+        const float linearSpeed = (
             -sinf(theta) * twist.vxMps +
             cosf(theta) * twist.vyMps +
             wheelBaseRadiusM_ * twist.wzRadps); ///< 当前轮接地点沿滚动方向的线速度，单位 m/s。
@@ -55,9 +54,9 @@ void OmniTriangleKinematics::wheelOmegaFromTwist(const ChassisTwist& twist, floa
 }
 
 void OmniTriangleKinematics::twistFromWheelCommand(const int16_t wheelCommand[kWheelCount], ChassisTwist& twist) const {
-    const float w0 = (wheelCommand[0] / wheelCommandScale_) * wheelRadiusM_ / kWheelSign[0];  // 0 号轮滚动方向线速度，单位 m/s。
-    const float w1 = (wheelCommand[1] / wheelCommandScale_) * wheelRadiusM_ / kWheelSign[1];  // 1 号轮滚动方向线速度，单位 m/s。
-    const float w2 = (wheelCommand[2] / wheelCommandScale_) * wheelRadiusM_ / kWheelSign[2];  // 2 号轮滚动方向线速度，单位 m/s。
+    const float w0 = (wheelCommand[0] / wheelCommandScale_) * wheelRadiusM_;  // 0 号轮滚动方向线速度，单位 m/s。
+    const float w1 = (wheelCommand[1] / wheelCommandScale_) * wheelRadiusM_;  // 1 号轮滚动方向线速度，单位 m/s。
+    const float w2 = (wheelCommand[2] / wheelCommandScale_) * wheelRadiusM_;  // 2 号轮滚动方向线速度，单位 m/s。
     const float theta0 = static_cast<float>(kWheelAngleDeg[0]) * kPi / 180.0f;  // 0 号轮滚动切向角，单位 rad。
     const float theta1 = static_cast<float>(kWheelAngleDeg[1]) * kPi / 180.0f;  // 1 号轮滚动切向角，单位 rad。
 

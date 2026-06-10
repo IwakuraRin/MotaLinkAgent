@@ -1,4 +1,4 @@
-/** @file uart.cpp
+/** @file src/driver/uart.cpp
  *  @brief 上位机 UART 行协议收发实现。
  */
 #include "driver/uart.h"

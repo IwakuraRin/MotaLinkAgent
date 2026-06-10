@@ -1,5 +1,5 @@
-/** @file main.cpp
- *  @brief ATmega2560 下位机入口，装配通信、传感器、底盘控制和本地安全调度。
+/** @file src/main.cpp
+ *  @brief ATMega2560 下位机程序入口。
  */
 #include <Arduino.h>
 #include <stdint.h>

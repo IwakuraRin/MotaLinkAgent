@@ -1,4 +1,4 @@
-/** @file command.cpp
+/** @file src/core/master/command.cpp
  *  @brief 上位机 UART 文本命令处理实现。
  */
 #include "core/master/command.h"
@@ -22,17 +22,18 @@ void formatSafetyTelemetry(const ObstacleSafety& safety, char* buffer, uint8_t b
     if (buffer == nullptr || bufferSize == 0) {
         return;
     }
+    const ObstacleSafetyState state = safety.state(); ///< 当前滤波距离和安全阈值快照。
     snprintf(
         buffer,
         bufferSize,
         "TEL SR04 mm=%u raw=%u median=%u blocked=%u hard=%u stop=%u clear=%u",
-        safety.filteredDistanceMm(),
+        state.filteredDistanceMm,
         rawDistanceMm,
-        safety.medianDistanceMm(),
+        state.medianDistanceMm,
         safety.blocked() ? 1 : 0,
-        safety.hardStopDistanceMm(),
-        safety.stopDistanceMm(),
-        safety.clearDistanceMm());
+        state.hardStopDistanceMm,
+        state.stopDistanceMm,
+        state.clearDistanceMm);
 }
 
 /**
@@ -46,8 +47,9 @@ void formatSafetyEvent(const ObstacleSafety& safety, char* buffer, uint8_t buffe
     if (buffer == nullptr || bufferSize == 0) {
         return;
     }
-    const char* state = event == kObstacleSafetyStop ? "STOP" : "CLEAR";
-    snprintf(buffer, bufferSize, "EVT OBSTACLE %s mm=%u", state, safety.filteredDistanceMm());
+    const ObstacleSafetyState safetyState = safety.state(); ///< 障碍物事件携带的当前距离快照。
+    const char* eventState = event == kObstacleSafetyStop ? "STOP" : "CLEAR"; ///< 上报给上位机的事件状态文本。
+    snprintf(buffer, bufferSize, "EVT OBSTACLE %s mm=%u", eventState, safetyState.filteredDistanceMm);
 }
 
 /**
@@ -60,16 +62,17 @@ void formatSafetyStatus(const ObstacleSafety& safety, char* buffer, uint8_t buff
     if (buffer == nullptr || bufferSize == 0) {
         return;
     }
+    const ObstacleSafetyState state = safety.state(); ///< 安全状态查询使用的距离和阈值快照。
     snprintf(
         buffer,
         bufferSize,
         "OK SAFETY hard=%u stop=%u clear=%u blocked=%u mm=%u median=%u",
-        safety.hardStopDistanceMm(),
-        safety.stopDistanceMm(),
-        safety.clearDistanceMm(),
+        state.hardStopDistanceMm,
+        state.stopDistanceMm,
+        state.clearDistanceMm,
         safety.blocked() ? 1 : 0,
-        safety.filteredDistanceMm(),
-        safety.medianDistanceMm());
+        state.filteredDistanceMm,
+        state.medianDistanceMm);
 }
 }
 
@@ -131,7 +134,8 @@ void MasterCommand::handleMotor(char* firstArg) {
 
     const ChassisCommandResult result = chassisMotionControl_.setManualWheelSpeed(wheelSpeed[0], wheelSpeed[1], wheelSpeed[2]); ///< 底盘模块执行 MOTOR 命令的结果。
     if (result == kChassisCommandRejectedSafety) {
-        snprintf(replyBuffer_, replyBufferSize_, "ERR MOTOR obstacle mm=%u", obstacleSafety_.filteredDistanceMm());
+        const ObstacleSafetyState safetyState = obstacleSafety_.state(); ///< MOTOR 被安全拒绝时上报的距离快照。
+        snprintf(replyBuffer_, replyBufferSize_, "ERR MOTOR obstacle mm=%u", safetyState.filteredDistanceMm);
         uartHostPC_.sendLine(replyBuffer_);
         return;
     }
@@ -156,7 +160,8 @@ void MasterCommand::handleChassis(char* firstArg) {
 
     const ChassisCommandResult result = chassisMotionControl_.setTargetTwistCommand(twist, millis()); ///< 底盘模块执行 CHASSIS 命令的结果。
     if (result == kChassisCommandRejectedSafety) {
-        snprintf(replyBuffer_, replyBufferSize_, "ERR CHASSIS obstacle mm=%u", obstacleSafety_.filteredDistanceMm());
+        const ObstacleSafetyState safetyState = obstacleSafety_.state(); ///< CHASSIS 被安全拒绝时上报的距离快照。
+        snprintf(replyBuffer_, replyBufferSize_, "ERR CHASSIS obstacle mm=%u", safetyState.filteredDistanceMm);
         uartHostPC_.sendLine(replyBuffer_);
         return;
     }
@@ -189,6 +194,7 @@ void MasterCommand::handleStatus() {
     }
 
     const ChassisTwist currentTwist = chassisMotionControl_.currentTwist(); ///< 当前平滑后的底盘执行速度。
+    const ObstacleSafetyState safetyState = obstacleSafety_.state(); ///< STATUS? 响应中的避障距离快照。
     snprintf(
         replyBuffer_,
         replyBufferSize_,
@@ -199,7 +205,7 @@ void MasterCommand::handleStatus() {
         status.enabled,
         status.faultCode,
         obstacleSafety_.blocked() ? 1 : 0,
-        obstacleSafety_.filteredDistanceMm(),
+        safetyState.filteredDistanceMm,
         static_cast<long>(currentTwist.vxMps * 1000.0f),
         static_cast<long>(currentTwist.vyMps * 1000.0f),
         static_cast<long>(currentTwist.wzRadps * 1000.0f));

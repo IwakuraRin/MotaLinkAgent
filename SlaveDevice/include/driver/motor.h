@@ -1,5 +1,5 @@
-/** @file motor.h
- *  @brief IIC 霍尔电机驱动板通信接口。
+/** @file include/driver/motor.h
+ *  @brief IIC 电机驱动接口定义。
  */
 #ifndef DRIVER_MOTOR_H
 #define DRIVER_MOTOR_H

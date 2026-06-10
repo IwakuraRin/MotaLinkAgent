@@ -1,4 +1,4 @@
-/** @file safety.cpp
+/** @file src/core/sensor/ultrasonic/safety.cpp
  *  @brief 超声波障碍物安全状态机实现。
  */
 #include "core/sensor/ultrasonic/safety.h"
@@ -121,26 +121,19 @@ uint16_t ObstacleSafety::median3(uint16_t a, uint16_t b, uint16_t c) {
     return b;
 }
 
+/** @brief 返回当前是否处于障碍物阻挡状态。 */
 bool ObstacleSafety::blocked() const {
     return blocked_;
 }
 
-uint16_t ObstacleSafety::filteredDistanceMm() const {
-    return filteredDistanceMm_;
-}
-
-uint16_t ObstacleSafety::medianDistanceMm() const {
-    return medianDistanceMm_;
-}
-
-uint16_t ObstacleSafety::stopDistanceMm() const {
-    return stopDistanceMm_;
-}
-
-uint16_t ObstacleSafety::clearDistanceMm() const {
-    return clearDistanceMm_;
-}
-
-uint16_t ObstacleSafety::hardStopDistanceMm() const {
-    return hardStopDistanceMm_;
+/** @brief 返回当前距离滤波结果和安全阈值快照。 */
+ObstacleSafetyState ObstacleSafety::state() const {
+    ObstacleSafetyState snapshot = {
+        medianDistanceMm_,
+        filteredDistanceMm_,
+        hardStopDistanceMm_,
+        stopDistanceMm_,
+        clearDistanceMm_
+    }; ///< 距离和阈值快照。
+    return snapshot;
 }

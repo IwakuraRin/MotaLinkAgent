@@ -1,5 +1,5 @@
-/** @file sr04.h
- *  @brief HC-SR04 超声波测距驱动。
+/** @file include/driver/sr04.h
+ *  @brief HC-SR04 驱动接口定义。
  */
 #ifndef DRIVER_SR04_H
 #define DRIVER_SR04_H

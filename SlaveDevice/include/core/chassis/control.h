@@ -1,5 +1,5 @@
-/** @file control.h
- *  @brief 底盘速度控制器，负责目标速度限幅、加速度平滑、PID 修正和驱动板输出。
+/** @file include/core/chassis/control.h
+ *  @brief 底盘控制接口定义。
  */
 #ifndef CORE_CHASSIS_CONTROL_H
 #define CORE_CHASSIS_CONTROL_H

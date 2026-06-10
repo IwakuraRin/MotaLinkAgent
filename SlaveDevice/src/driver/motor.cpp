@@ -1,4 +1,4 @@
-/** @file motor.cpp
+/** @file src/driver/motor.cpp
  *  @brief IIC 霍尔电机驱动板通信实现。
  */
 #include "driver/motor.h"
