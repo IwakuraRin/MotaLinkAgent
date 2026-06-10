@@ -1,5 +1,5 @@
-/** @file parser.h
- *  @brief 上位机命令参数解析工具。
+/** @file include/core/master/parser.h
+ *  @brief 上位机命令参数解析接口定义。
  */
 #ifndef CORE_MASTER_PARSER_H
 #define CORE_MASTER_PARSER_H

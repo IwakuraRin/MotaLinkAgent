@@ -1,5 +1,5 @@
-/** @file parser.cpp
- *  @brief 上位机命令参数解析实现。
+/** @file src/core/master/parser.cpp
+ *  @brief 上位机命令参数解析接口实现。
  */
 #include "core/master/parser.h"
 

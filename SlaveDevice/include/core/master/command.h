@@ -1,5 +1,5 @@
-/** @file command.h
- *  @brief 上位机 UART 文本命令处理器。
+/** @file include/core/master/command.h
+ *  @brief 上位机 UART 文本命令处理接口定义。
  */
 #ifndef CORE_MASTER_COMMAND_H
 #define CORE_MASTER_COMMAND_H

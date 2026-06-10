@@ -1,5 +1,5 @@
-/** @file safety.h
- *  @brief 超声波障碍物安全状态机。
+/** @file include/core/sensor/ultrasonic/safety.h
+ *  @brief 障碍物安全状态机定义。
  */
 #ifndef CORE_SENSOR_ULTRASONIC_SAFETY_H
 #define CORE_SENSOR_ULTRASONIC_SAFETY_H
@@ -22,6 +22,15 @@ struct ObstacleSafetyResult {
     bool valid;                  ///< 本次原始距离是否有效，0 距离视为无效。
     bool blocked;                ///< 更新后的障碍物阻挡状态。
     ObstacleSafetyEvent event;   ///< 本次更新产生的状态变化事件。
+};
+
+/** @brief 距离和阈值快照。 */
+struct ObstacleSafetyState {
+    uint16_t medianDistanceMm;   ///< 最近 3 次有效距离的中值结果，单位 mm。
+    uint16_t filteredDistanceMm; ///< 低通滤波后的稳定距离，单位 mm。
+    uint16_t hardStopDistanceMm; ///< 原始距离触发立即急停的阈值，单位 mm。
+    uint16_t stopDistanceMm;     ///< 进入阻挡状态的距离阈值，单位 mm。
+    uint16_t clearDistanceMm;    ///< 解除阻挡状态的距离阈值，单位 mm。
 };
 
 /** @brief 用滤波、迟滞阈值和连续计数实现稳定的障碍物急停判断。 */
@@ -55,30 +64,10 @@ public:
      */
     bool blocked() const;
     /**
-     * @brief 最近一次低通滤波后的距离，单位 mm。
-     * @return 滤波距离，单位 mm。
+     * @brief 当前距离和阈值快照。
+     * @return 当前滤波距离和阈值。
      */
-    uint16_t filteredDistanceMm() const;
-    /**
-     * @brief 最近 3 次有效距离的中值结果，单位 mm。
-     * @return 中值距离，单位 mm。
-     */
-    uint16_t medianDistanceMm() const;
-    /**
-     * @brief 进入阻挡状态的距离阈值，单位 mm。
-     * @return 停止阈值，单位 mm。
-     */
-    uint16_t stopDistanceMm() const;
-    /**
-     * @brief 解除阻挡状态的距离阈值，单位 mm。
-     * @return 解除阈值，单位 mm。
-     */
-    uint16_t clearDistanceMm() const;
-    /**
-     * @brief 原始距离触发立即急停的阈值，单位 mm。
-     * @return 立即急停阈值，单位 mm。
-     */
-    uint16_t hardStopDistanceMm() const;
+    ObstacleSafetyState state() const;
 
 private:
     static const uint8_t kMedianSampleCount = 3; ///< 中值滤波窗口大小。

@@ -1,5 +1,5 @@
-/** @file control.cpp
- *  @brief 底盘速度控制、PID 修正和驱动板输出实现。
+/** @file src/core/chassis/control.cpp
+ *  @brief 底盘控制接口实现。
  */
 #include "core/chassis/control.h"
 

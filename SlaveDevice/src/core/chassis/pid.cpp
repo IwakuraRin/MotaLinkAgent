@@ -1,5 +1,5 @@
-/** @file pid.cpp
- *  @brief 三轮霍尔反馈速度 PID 修正实现。
+/** @file src/core/chassis/pid.cpp
+ *  @brief 轮速 PID 接口实现。
  */
 #include "core/chassis/pid.h"
 

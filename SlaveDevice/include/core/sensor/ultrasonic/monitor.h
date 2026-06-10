@@ -1,5 +1,5 @@
-/** @file monitor.h
- *  @brief 超声波避障运行循环，负责采样调度并返回安全事件和上报节拍。
+/** @file include/core/sensor/ultrasonic/monitor.h
+ *  @brief 超声波监视器定义。
  */
 #ifndef CORE_SENSOR_ULTRASONIC_MONITOR_H
 #define CORE_SENSOR_ULTRASONIC_MONITOR_H

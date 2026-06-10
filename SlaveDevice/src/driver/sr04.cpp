@@ -1,5 +1,5 @@
-/** @file sr04.cpp
- *  @brief HC-SR04 单次测距实现。
+/** @file src/driver/sr04.cpp
+ *  @brief HC-SR04 驱动接口实现。
  */
 #include "driver/sr04.h"
 

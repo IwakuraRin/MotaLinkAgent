@@ -1,4 +1,4 @@
-/** @file monitor.cpp
+/** @file src/core/sensor/ultrasonic/monitor.cpp
  *  @brief 超声波采样调度和避障运行结果生成。
  */
 #include "core/sensor/ultrasonic/monitor.h"
@@ -26,12 +26,13 @@ void ObstacleMonitor::configure(uint32_t sampleIntervalMs, uint32_t reportInterv
 
 /** @brief 到达采样周期时读取距离并更新安全状态；未到周期时返回当前状态快照。 */
 ObstacleMonitorResult ObstacleMonitor::update(uint32_t nowMs) {
+    const ObstacleSafetyState safetyState = obstacleSafety_.state(); ///< 未采样时返回给调用者的距离和阈值快照。
     ObstacleMonitorResult output = { ///< 默认返回当前安全状态；未到采样周期时不触发事件或上报。
         false,
         false,
         false,
         lastRawDistanceMm_,
-        {lastRawDistanceMm_, obstacleSafety_.medianDistanceMm(), obstacleSafety_.filteredDistanceMm(), lastRawDistanceMm_ > 0, obstacleSafety_.blocked(), kObstacleSafetyNone}
+        {lastRawDistanceMm_, safetyState.medianDistanceMm, safetyState.filteredDistanceMm, lastRawDistanceMm_ > 0, obstacleSafety_.blocked(), kObstacleSafetyNone}
     };
 
     if (nowMs - lastSampleMs_ < sampleIntervalMs_) {

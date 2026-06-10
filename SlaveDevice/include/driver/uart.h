@@ -1,5 +1,5 @@
-/** @file uart.h
- *  @brief 上位机 UART 行协议收发封装。
+/** @file include/driver/uart.h
+ *  @brief UART 行协议接口定义。
  */
 #ifndef DRIVER_UART_H
 #define DRIVER_UART_H
