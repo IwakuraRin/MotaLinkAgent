@@ -24,6 +24,18 @@ public sealed record SessionClosedMessage(string Type, string? RequestId, string
         new(BridgeMessageTypes.SessionClosed, requestId, sessionId);
 }
 
+public sealed record SessionOutputMessage(string Type, string SessionId, string Stream, string Text)
+{
+    public static SessionOutputMessage Create(string sessionId, string stream, string text) =>
+        new(BridgeMessageTypes.SessionOutput, sessionId, stream, text);
+}
+
+public sealed record SessionExitMessage(string Type, string SessionId, int ExitCode)
+{
+    public static SessionExitMessage Create(string sessionId, int exitCode) =>
+        new(BridgeMessageTypes.SessionExit, sessionId, exitCode);
+}
+
 public sealed record SessionListMessage(string Type, string? RequestId, IReadOnlyList<SessionSummary> Sessions)
 {
     public static SessionListMessage Create(string? requestId, IReadOnlyList<SessionSummary> sessions) =>

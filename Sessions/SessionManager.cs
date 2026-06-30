@@ -9,7 +9,7 @@ public sealed class SessionManager(
     ICliRegistry cliRegistry,
     ICwdPolicy cwdPolicy,
     IPtyProcessFactory ptyProcessFactory,
-    ILogger<SessionManager> logger) : ISessionManager
+    ILogger<SessionManager> logger) : ISessionManager, IAsyncDisposable
 {
     private const int MinCols = 20;
     private const int MaxCols = 300;
@@ -17,6 +17,10 @@ public sealed class SessionManager(
     private const int MaxRows = 120;
 
     private readonly ConcurrentDictionary<string, CliSession> _sessions = new(StringComparer.Ordinal);
+
+    public event EventHandler<SessionOutputEvent>? OutputReceived;
+
+    public event EventHandler<SessionExitEvent>? SessionExited;
 
     public async Task<string> CreateAsync(CreateSessionInput input, CancellationToken cancellationToken)
     {
@@ -38,6 +42,8 @@ public sealed class SessionManager(
         var normalizedCwd = Path.GetFullPath(input.Cwd);
         var process = ptyProcessFactory.Start(cli, normalizedCwd, input.Cols, input.Rows);
         var session = new CliSession(sessionId, cli, process, normalizedCwd, input.Cols, input.Rows, now);
+        process.OutputReceived += output => HandleProcessOutput(sessionId, output);
+        process.Exited += exitCode => HandleProcessExit(sessionId, exitCode);
 
         if (!_sessions.TryAdd(sessionId, session))
         {
@@ -124,6 +130,18 @@ public sealed class SessionManager(
             .Select(session => new SessionSummary(session.SessionId, session.Cli.Id, session.Cwd, session.CreatedAt, session.LastActivityAt))
             .ToList();
 
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var sessionId in _sessions.Keys)
+        {
+            if (_sessions.TryRemove(sessionId, out var session))
+            {
+                await session.DisposeAsync();
+                logger.LogInformation("Session {SessionId} disposed during bridge shutdown", session.SessionId);
+            }
+        }
+    }
+
     private CliSession GetRequiredSession(string sessionId)
     {
         if (_sessions.TryGetValue(sessionId, out var session))
@@ -144,6 +162,37 @@ public sealed class SessionManager(
         if (rows is < MinRows or > MaxRows)
         {
             throw new ArgumentOutOfRangeException(nameof(rows), $"rows must be between {MinRows} and {MaxRows}.");
+        }
+    }
+
+    private void HandleProcessOutput(string sessionId, CliProcessOutput output)
+    {
+        if (_sessions.TryGetValue(sessionId, out var session))
+        {
+            session.Touch(DateTimeOffset.UtcNow);
+            OutputReceived?.Invoke(this, new SessionOutputEvent(sessionId, output.Stream, output.Text));
+        }
+    }
+
+    private void HandleProcessExit(string sessionId, int exitCode)
+    {
+        if (_sessions.TryRemove(sessionId, out var session))
+        {
+            logger.LogInformation("Session {SessionId} exited with code {ExitCode}", session.SessionId, exitCode);
+            SessionExited?.Invoke(this, new SessionExitEvent(sessionId, exitCode));
+            _ = DisposeExitedSessionAsync(session);
+        }
+    }
+
+    private async Task DisposeExitedSessionAsync(CliSession session)
+    {
+        try
+        {
+            await session.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to dispose exited session {SessionId}", session.SessionId);
         }
     }
 }

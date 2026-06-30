@@ -1,6 +1,8 @@
 using System.Net.WebSockets;
+using Microsoft.Extensions.Options;
 using MotaBridge.Auth;
 using MotaBridge.Cli;
+using MotaBridge.Config;
 using MotaBridge.Protocol;
 using MotaBridge.Sessions;
 
@@ -10,6 +12,7 @@ public sealed class BridgeWebSocketEndpoint(
     ITokenAuthenticator authenticator,
     ICliRegistry cliRegistry,
     ISessionManager sessions,
+    IOptions<BridgeOptions> options,
     ILogger<BridgeWebSocketEndpoint> logger)
 {
     public async Task HandleAsync(HttpContext context, CancellationToken cancellationToken)
@@ -32,7 +35,7 @@ public sealed class BridgeWebSocketEndpoint(
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         logger.LogInformation("Accepted WebSocket connection from {RemoteIp}", context.Connection.RemoteIpAddress);
 
-        var connection = new WebSocketConnection(socket, sessions, logger);
+        await using var connection = new WebSocketConnection(socket, sessions, options.Value, logger);
         await connection.SendAsync(BridgeReadyMessage.Create(cliRegistry.List().Select(cli => cli.Id).ToList()), cancellationToken);
         await connection.ReceiveLoopAsync(cancellationToken);
     }
