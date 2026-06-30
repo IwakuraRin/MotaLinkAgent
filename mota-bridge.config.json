@@ -1,0 +1,28 @@
+{
+  "host": "127.0.0.1",
+  "port": 8765,
+  "authToken": "change-me-local-token",
+  "sessionIdleTimeoutMs": 600000,
+  "terminateOnDisconnect": true,
+  "keepAliveOnDisconnect": false,
+  "clis": [
+    {
+      "id": "codex",
+      "label": "Codex CLI",
+      "command": "codex",
+      "args": [],
+      "allowedCwds": [
+        "/Users/jhb/Desktop/Mota"
+      ]
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi CLI",
+      "command": "kimi",
+      "args": [],
+      "allowedCwds": [
+        "/Users/jhb/Desktop/Mota"
+      ]
+    }
+  ]
+}
